@@ -11,6 +11,6 @@ link-citations: true
 
 TODO
 
-[@schmidhuber] [@cywinski2025saeuron]
+[@schmidhuber] [@cywinski2025saeuron] [@sae]
 
 Dokumentacja wstępna powinna zawierać opis zadania, przewidywany sposób rozwiązania problemu i wyjaśnienie poczynionych założeń (typ modelu, wybrane zbiory danych, narzędzia, zakładana funkcjonalność itp.).
