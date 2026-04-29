@@ -1,0 +1,12 @@
+[project]
+name = "zzsn-projekt"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "datasets>=4.8.5",
+    "huggingface-hub>=1.12.2",
+    "torch>=2.11.0",
+    "tqdm>=4.67.3",
+]
