@@ -1,7 +1,7 @@
 import hydra
 from omegaconf import DictConfig
 import torch
-from diffusers import AutoPipelineForText2Image
+from diffusers import StableDiffusionPipeline
 import os
 
 
@@ -12,13 +12,18 @@ def main(_: DictConfig):
     print(torch.cuda.is_available())
 
 
-    pipe = AutoPipelineForText2Image.from_pretrained("stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16")
-    pipe.to("cuda")
+    model_id = "CompVis/stable-diffusion-v1-4"
+    device = "cuda"
 
-    prompt = "A cinematic shot of a baby racoon wearing an intricate italian priest robe."
 
-    image = pipe(prompt=prompt, num_inference_steps=1, guidance_scale=0.0).images[0]
-    image.save("output.png")
+    pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16)
+    pipe = pipe.to(device)
+
+    prompt = "capybara riding a unicycle"
+    image = pipe(prompt).images[0]  
+        
+    image.save("capybara_rides_unicycle.png")
+
 
 
 
