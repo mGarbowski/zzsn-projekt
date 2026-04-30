@@ -4,6 +4,8 @@ Ogólne tutoriale:
 
 ## Dostęp do repo
 
+0. Aktywuj dostęp do Atheny na [stronce](https://portal.plgrid.pl/)
+
 1. Z poziomu anteny `ssh-keygen` i zrzucasz klucz np. do `~/.ssh/id_zzsn_github`:
 
 2. `~/.ssh/config`:
@@ -36,6 +38,24 @@ echo "export UV_CACHE_DIR=$SCRATCH/uv_cache" >> ~/.bashrc
 ```bash
 echo "export HF_HUB_CACHE=$SCRATCH/hf_hub_cache" >> ~/.bashrc
 echo "export HF_HOME=$SCRATCH/hf_home" >> ~/.bashrc
+```
+
+4. Tworzenie venva
+
+https://pydevtools.com/handbook/how-to/how-to-customize-uvs-virtual-environment-location/
+
+```bash
+uv venv $SCRATCH/venvs/zzsn-projekt # create venv in scratch
+source $SCRATCH/venvs/zzsn-projekt/bin/activate # activate it
+uv sync --active # install deps
+uv run --active ....  # use it to run code
+```
+
+Alernatywnie po zainstalowaniu justa (`curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to $HOME/bin`):
+```bash
+just init-athena
+just venv-athena
+just run-athena [args]
 ```
 
 ## Uruchamianie kodu lokalnie i na athenie
