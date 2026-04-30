@@ -11,7 +11,7 @@ hydra:
 
     nodes: 1
     #Keep tasks per node the same as gpus (besides gpus = 0 for CPU jobs)
-    gpus_per_node: 0
+    gpus_per_node: 1
     tasks_per_node: 1
 
     # Athena allows up to 16 CPUs and ~125GB RAM per A100 without extra charge.
