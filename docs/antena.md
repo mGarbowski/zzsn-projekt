@@ -37,3 +37,13 @@ echo "export UV_CACHE_DIR=$SCRATCH/uv_cache" >> ~/.bashrc
 echo "export HF_HUB_CACHE=$SCRATCH/hf_hub_cache" >> ~/.bashrc
 echo "export HF_HOME=$SCRATCH/hf_home" >> ~/.bashrc
 ```
+
+## Uruchamianie kodu lokalnie i na athenie
+
+- https://hydra.cc/docs/plugins/submitit_launcher/
+
+Generalnie, żeby odpalić job przez slurma, trzeba uruchomić apkę hydrową z flagą -m/--multirun, np. `uv run -m main -m <opcje do nadpisania>`.
+
+Odpalanie bez -m uruchamia z domyślnym launcherem, można tak odpalać lokalnie pojedynczy config. Żeby lokalnie odpalić multirun trzeba nadpisać opcję `infra`: `uv run -m main -m infra=local`.
+
+Żeby uruchamiać joby na athenie, potrzeba wypełnionego enva na wzór `.env.example` i ustawienia `UV_ENV_FILE` (może być przez direnv i `.envrc`, ale trzeba pobrać curlem).
