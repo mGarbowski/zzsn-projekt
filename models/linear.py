@@ -11,6 +11,7 @@ class SchmidhuberLinearConfig:
     expansion_factor: int
     predictor_hidden_dims: list[int]
     predictor_dropout: float
+    predictor_embedding_dim: int
 
 class SchmidhuberLinear(nn.Module):
     """A simple linear variant of Schmidhuber's architecture for predictability minimization.
@@ -26,52 +27,92 @@ class SchmidhuberLinear(nn.Module):
         self.encoder = nn.Linear(in_features=config.input_dim, out_features=self.dictionary_dim)
         self.decoder = nn.Linear(in_features=self.dictionary_dim, out_features=config.input_dim)
 
-        # One predictor per dimension of the sparse representation, each trying to predict that dimension from the others
-        self.predictors = nn.ModuleList([
-            SchmidhuberPredictor(
-                dictionary_dim=self.dictionary_dim,
-                mlp_hidden_dims=config.predictor_hidden_dims,
-                dropout=config.predictor_dropout,
-            )
-            for _ in range(self.dictionary_dim)
-        ])
+        # Same predictor reused multiple times (once per dictionary dimension)
+        self.shared_predictor = SchmidhuberSharedPredictor(
+            dictionary_dim=self.dictionary_dim,
+            mlp_hidden_dims=config.predictor_hidden_dims,
+            mlp_dropout=config.predictor_dropout,
+            index_embedding_dim=config.predictor_embedding_dim
+        )
 
-    def predict_kth(self, k: int, sparse_representation: torch.Tensor) -> torch.Tensor:
-        """Predict the k-th dimension of the sparse representation from the others."""
-        assert len(sparse_representation.shape) == 2, "Expected input shape (batch_dim, dictionary_dim)"
-        assert sparse_representation.shape[1] == self.dictionary_dim, "Expected input shape (batch_dim, dictionary_dim)"
-        assert 0 <= k < self.dictionary_dim
-        # Batch without the k-th dimension for each sparse vector in batch
-        input_to_predictor = torch.cat([sparse_representation[:, :k], sparse_representation[:, k+1:]], dim=1)
-        return self.predictors[k](input_to_predictor)
-    
+
+    # TODO batching
     def predict_all(self, sparse_representation: torch.Tensor) -> torch.Tensor:
-        """Predict all dimensions using corresponding predictors.
+        """Predict all dimensions using the shared predictor.
         
         Takes in a batch of sparse representations (batch_dim, dictionary_dim).
         Return batch of predictions (batch_dim, dictionary_dim)
         """
-        return torch.cat(
-            [
-                self.predict_kth(k, sparse_representation)
-                for k in range(self.dictionary_dim)
-            ],
-            dim=1
-        )
+        batch_size, _ = sparse_representation.shape
+        results = []
+        for k in range(self.dictionary_dim):
+            ks = torch.full((batch_size,), k, dtype=torch.long, device=sparse_representation.device)
+            k_prediction = self.shared_predictor(sparse_representation, predicted_dim_idx=ks)
+            results.append(k_prediction)
+        return torch.cat(results, dim=-1)  # (batch_dim, dictionary_dim)
+    
+    def num_parameters(self) -> int:
+        """Return the total number of parameters in the model."""
+        return sum(p.numel() for p in self.parameters())
+    
+    def freeze_autoencoder(self):
+        """Freeze the encoder and decoder weights (for predictors update)."""
+        self.encoder.eval()
+        self.decoder.eval()
+
+    def unfreeze_autoencoder(self):
+        """Unfreeze the encoder and decoder weights (for autoencoder update)."""
+        self.encoder.train()
+        self.decoder.train()
+
+    def freeze_predictors(self):
+        """Freeze the predictor weights (for autoencoder update)."""
+        self.shared_predictor.eval()
+
+    def unfreeze_predictors(self):
+        """Unfreeze the predictor weights (for predictors update)."""
+        self.shared_predictor.train()
 
 
-class SchmidhuberPredictor(nn.Module):
-    def __init__(self, dictionary_dim: int, mlp_hidden_dims: list[int], dropout: float):
+class SchmidhuberSharedPredictor(nn.Module):
+    """One network is reused for predicting each of the dictionary dimensions
+    
+    Backbone is an MLP
+    the MLP receives as input the sparse representation vector with the predicted dimension zeroed out,
+    concatenated with an embedding of the predicted dimension index (to allow the network to know which dimension is being predicted).
+
+    the output is scalar - the prediction for the value of the predicted dimension.
+    """
+    def __init__(self, dictionary_dim: int, mlp_hidden_dims: list[int], mlp_dropout: float, index_embedding_dim: int):
         super().__init__()
-        self.net = MLP(
-            input_dim=dictionary_dim-1,
+        self.dictionary_dim = dictionary_dim
+        self.index_embedding = nn.Embedding(num_embeddings=dictionary_dim, embedding_dim=index_embedding_dim)
+        self.mlp = MLP(
+            input_dim=dictionary_dim + index_embedding_dim,  # sparse representation with one dimension zeroed out + index embedding
             hidden_dims=mlp_hidden_dims,
-            output_dim=1,
-            dropout=dropout,
+            output_dim=1,  # scalar prediction for the value of the predicted dimension
+            dropout=mlp_dropout,
         )
+        
 
-    def forward(self, x):
-        return self.net(x)
+    def forward(self, sparse_representation: torch.Tensor, predicted_dim_idx: torch.Tensor):
+        """
+        sparse representation: (batch_dim, dictionary_dim)
+        predicted_dim_idx: (batch_dim,) - index of dimension to predict for each batch item
+        """
+        assert sparse_representation.shape[0] == predicted_dim_idx.shape[0]
+        assert len(sparse_representation.shape) == 2
+        assert len(predicted_dim_idx.shape) == 1
+
+        batch_size = predicted_dim_idx.shape[0]
+        masked_representation = sparse_representation.clone()
+        idx = torch.arange(batch_size)
+        masked_representation[idx, predicted_dim_idx] = 0.0  # zero out the predicted dimension
+        emb = self.index_embedding(predicted_dim_idx)
+        mlp_input = torch.cat([masked_representation, emb], dim=-1)
+        return self.mlp(mlp_input)
+    
+
 
 
 # TODO use existing implementation
