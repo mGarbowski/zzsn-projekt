@@ -57,20 +57,32 @@ class SchmidhuberLinear(nn.Module):
     
     def freeze_autoencoder(self):
         """Freeze the encoder and decoder weights (for predictors update)."""
+        for param in self.encoder.parameters():
+            param.requires_grad = False
+        for param in self.decoder.parameters():
+            param.requires_grad = False
         self.encoder.eval()
         self.decoder.eval()
 
     def unfreeze_autoencoder(self):
         """Unfreeze the encoder and decoder weights (for autoencoder update)."""
+        for param in self.encoder.parameters():
+            param.requires_grad = True
+        for param in self.decoder.parameters():
+            param.requires_grad = True
         self.encoder.train()
         self.decoder.train()
 
     def freeze_predictors(self):
         """Freeze the predictor weights (for autoencoder update)."""
+        for param in self.shared_predictor.parameters():
+            param.requires_grad = False
         self.shared_predictor.eval()
 
     def unfreeze_predictors(self):
         """Unfreeze the predictor weights (for predictors update)."""
+        for param in self.shared_predictor.parameters():
+            param.requires_grad = True
         self.shared_predictor.train()
 
 
@@ -106,7 +118,7 @@ class SchmidhuberSharedPredictor(nn.Module):
 
         batch_size = predicted_dim_idx.shape[0]
         masked_representation = sparse_representation.clone()
-        idx = torch.arange(batch_size)
+        idx = torch.arange(batch_size, device=sparse_representation.device)
         masked_representation[idx, predicted_dim_idx] = 0.0  # zero out the predicted dimension
         emb = self.index_embedding(predicted_dim_idx)
         mlp_input = torch.cat([masked_representation, emb], dim=-1)
