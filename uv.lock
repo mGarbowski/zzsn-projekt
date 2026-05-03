@@ -2002,6 +2002,7 @@ dependencies = [
     { name = "loguru" },
     { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
     { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
+    { name = "tqdm" },
     { name = "transformers" },
 ]
 
@@ -2020,6 +2021,7 @@ requires-dist = [
     { name = "hydra-submitit-launcher", specifier = ">=1.2.0" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "torch", specifier = ">=2.5.1", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "tqdm", specifier = ">=4.66.5" },
     { name = "transformers", specifier = ">=5.7.0" },
 ]
 
