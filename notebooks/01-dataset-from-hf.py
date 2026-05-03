@@ -94,5 +94,59 @@ def _():
     return
 
 
+@app.cell
+def _(data):
+    from datasets import Dataset
+
+    flat_activations = []
+    flat_timesteps = []
+    flat_prompts = []
+
+    for row in data["train"]:
+        acts = row["activations"]  # shape: (256, 1280)
+        timestep = row["timestep"]
+        prompt = row["prompt"]
+
+        for vec in acts:
+            flat_activations.append(vec)
+            flat_timesteps.append(timestep)
+            flat_prompts.append(prompt)
+
+    flat_train = Dataset.from_dict({
+        "activations": flat_activations,
+        "timestep": flat_timesteps,
+        "prompt": flat_prompts,
+    }).with_format("torch")
+    return (flat_train,)
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell
+def _(flat_train):
+    element_flat = next(iter(flat_train))
+    print(element_flat["activations"].shape)  # torch.Size([1280])
+    print(type(element_flat["activations"]))
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell
+def _(flat_train):
+    from torch.utils.data import DataLoader
+
+    loader = DataLoader(flat_train, batch_size=32, shuffle=True)
+    batch = next(iter(loader))
+    print(batch["activations"].shape)  # torch.Size([32, 1280])
+    return
+
+
 if __name__ == "__main__":
     app.run()
