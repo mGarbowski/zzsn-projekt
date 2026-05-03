@@ -1,0 +1,4 @@
+defaults:
+  - collect_activations_config
+  - infra: athena
+  - _self_
