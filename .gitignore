@@ -3,3 +3,5 @@ outputs
 multirun
 /.env
 activations
+scratch
+data
