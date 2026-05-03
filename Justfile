@@ -10,3 +10,6 @@ run-athena script *ARGS:
 
 test:
   uv run pytest
+
+marimo:
+  uv run marimo edit
