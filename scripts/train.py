@@ -56,48 +56,50 @@ def main(cfg: TrainScriptConfig) -> None:
     run_cfg: TrainScriptConfig = OmegaConf.to_container(
         cfg, resolve=True, structured_config_mode=SCMode.INSTANTIATE
     )
-
-    torch.manual_seed(run_cfg.seed)
-
-    model_cfg = SchmidhuberLinearConfig(
-        input_dim=run_cfg.input_dim,
-        expansion_factor=run_cfg.expansion_factor,
-        predictor_hidden_dims=run_cfg.predictor_hidden_dims,
-        predictor_dropout=run_cfg.predictor_dropout,
-        predictor_embedding_dim=run_cfg.predictor_embedding_dim,
-    )
-
-    trainer_cfg = TrainerConfig(
-        model_config=model_cfg,
-        batch_size=run_cfg.batch_size,
-        num_epochs=run_cfg.num_epochs,
-        learning_rate_predictors=run_cfg.learning_rate_predictors,
-        learning_rate_autoencoder=run_cfg.learning_rate_autoencoder,
-        reconstruction_loss_weight=run_cfg.reconstruction_loss_weight,
-        dataset_repo_id=run_cfg.dataset_repo_id,
-        wandb_project=run_cfg.wandb_project,
-        wandb_run_name=run_cfg.wandb_run_name,
-        wandb_mode=run_cfg.wandb_mode,
-        checkpoint_dir=Path(run_cfg.checkpoint_dir),
-        device=run_cfg.device,
-    )
-
-    model = SchmidhuberLinear(model_cfg)
-    model = model.to(torch.device(run_cfg.device))
-    print(f"Created model with {model.num_parameters()} parameters")
-
-    flat_train = flatten_token_dataset(run_cfg.dataset_repo_id, run_cfg.dataset_split)
-
-    loader = torch.utils.data.DataLoader(
-        flat_train,
-        batch_size=run_cfg.batch_size,
-        shuffle=run_cfg.shuffle,
-        num_workers=run_cfg.num_workers,
-    )
-
-    print("Starting training...")
     try:
+        torch.manual_seed(run_cfg.seed)
+
+        model_cfg = SchmidhuberLinearConfig(
+            input_dim=run_cfg.input_dim,
+            expansion_factor=run_cfg.expansion_factor,
+            predictor_hidden_dims=run_cfg.predictor_hidden_dims,
+            predictor_dropout=run_cfg.predictor_dropout,
+            predictor_embedding_dim=run_cfg.predictor_embedding_dim,
+        )
+
+        trainer_cfg = TrainerConfig(
+            model_config=model_cfg,
+            batch_size=run_cfg.batch_size,
+            num_epochs=run_cfg.num_epochs,
+            learning_rate_predictors=run_cfg.learning_rate_predictors,
+            learning_rate_autoencoder=run_cfg.learning_rate_autoencoder,
+            reconstruction_loss_weight=run_cfg.reconstruction_loss_weight,
+            dataset_repo_id=run_cfg.dataset_repo_id,
+            wandb_project=run_cfg.wandb_project,
+            wandb_run_name=run_cfg.wandb_run_name,
+            wandb_mode=run_cfg.wandb_mode,
+            checkpoint_dir=Path(run_cfg.checkpoint_dir),
+            device=run_cfg.device,
+        )
+
+        model = SchmidhuberLinear(model_cfg)
+        model = model.to(torch.device(run_cfg.device))
+        print(f"Created model with {model.num_parameters()} parameters")
+
+        flat_train = flatten_token_dataset(
+            run_cfg.dataset_repo_id, run_cfg.dataset_split
+        )
+
+        loader = torch.utils.data.DataLoader(
+            flat_train,
+            batch_size=run_cfg.batch_size,
+            shuffle=run_cfg.shuffle,
+            num_workers=run_cfg.num_workers,
+        )
+
+        print("Starting training...")
         Trainer(trainer_cfg, model).train(loader)
+
     except Exception:
         traceback.print_exc(file=sys.stderr)
         raise
