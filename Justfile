@@ -30,6 +30,10 @@ run-local script *ARGS:
 run-athena script *ARGS:  
   source $SCRATCH/venvs/zzsn-projekt/bin/activate && UV_ENV_FILE=.env uv run --active -m scripts.{{script}} -m {{ARGS}}
 
+# Peek job queue on Athena
+queue:
+  squeue --me
+
 # Run unit tests
 test:
   uv run pytest
