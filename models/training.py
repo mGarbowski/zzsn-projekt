@@ -17,10 +17,10 @@ class TrainerConfig:
     learning_rate_autoencoder: float
     reconstruction_loss_weight: float
     dataset_repo_id: str
+    checkpoint_dir: str
     wandb_project: str = "zzsn-projekt"
     wandb_run_name: str | None = None
     wandb_mode: str = "online"  # "online", "offline", or "disabled"
-    checkpoint_dir: str
 
 
 class Trainer:
