@@ -18,7 +18,7 @@ hydra:
     cpus_per_task: 16
     mem_gb: 125
 
-    timeout_min: 30
+    timeout_min: 600
 
     max_num_timeout: 3
     signal_delay_s: 120
