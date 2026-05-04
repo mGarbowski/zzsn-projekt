@@ -3,6 +3,9 @@ from typing import Optional
 
 from hydra.core.config_store import ConfigStore
 
+from conf.paths import SCRATCH_ROOT
+
+
 @dataclass
 class TrainScriptConfig:
     # model config
@@ -12,7 +15,7 @@ class TrainScriptConfig:
     predictor_dropout: float = 0.3
     predictor_embedding_dim: int = 128
 
-    #trainer config
+    # trainer config
     batch_size: int = 32
     num_epochs: int = 3
     learning_rate_predictors: float = 4e-4
@@ -33,6 +36,7 @@ class TrainScriptConfig:
     wandb_project: str = "zzsn-projekt"
     wandb_run_name: Optional[str] = None
     wandb_mode: str = "online"  # online | offline | disabled
+    checkpoint_dir: str = SCRATCH_ROOT / "checkpoints"
 
     def __post_init__(self) -> None:
         if self.batch_size <= 0:
@@ -47,6 +51,7 @@ class TrainScriptConfig:
             raise ValueError("relative reconstruction_loss_weight must be >= 0")
         if self.wandb_mode not in {"online", "offline", "disabled"}:
             raise ValueError("wandb_mode must be one of: online, offline, disabled")
+
 
 def register_configs() -> None:
     cs = ConfigStore.instance()

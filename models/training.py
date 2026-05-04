@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from pathlib import Path
 from tqdm import tqdm
 
 from models.linear import SchmidhuberLinear, SchmidhuberLinearConfig
@@ -19,6 +20,7 @@ class TrainerConfig:
     wandb_project: str = "zzsn-projekt"
     wandb_run_name: str | None = None
     wandb_mode: str = "online"  # "online", "offline", or "disabled"
+    checkpoint_dir: str
 
 
 class Trainer:
@@ -129,6 +131,9 @@ class Trainer:
                         step=global_step,
                     )
                     global_step += 1
+
+                self.save_checkpoint(epoch_idx)
+
         finally:
             wandb.finish()
 
@@ -138,3 +143,17 @@ class Trainer:
             "predictability_loss": predictability_losses,
             "autoencoder_loss": autoencoder_losses,
         }
+
+    def save_checkpoint(self, epoch_idx: int):
+        checkpoint_dir = Path(f"{self.cfg.checkpoint_dir}/{wandb.run.id}")
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+        checkpoint_path = checkpoint_dir / f"model_epoch_{epoch_idx}.pt"
+        torch.save(self.model.state_dict(), checkpoint_path)
+
+        if self.cfg.wandb_mode != "disabled":
+            artifact = wandb.Artifact(
+                name=f"model-{wandb.run.id}-epoch_{epoch_idx}", type="model"
+            )
+            artifact.add_file(str(checkpoint_path))
+            wandb.log_artifact(artifact)

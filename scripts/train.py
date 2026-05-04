@@ -17,7 +17,7 @@ register_configs()
 
 def flatten_token_dataset(dataset_repo_id: str, split: str = "train") -> Dataset:
     """Load dataset and flatten spatial tokens for training.
-    
+
     Converts shape (256, 1280) per image to 256 individual token samples.
     """
     data = load_dataset(dataset_repo_id, split=split).with_format("pytorch")
@@ -77,10 +77,12 @@ def main(cfg: TrainScriptConfig) -> None:
         wandb_project=run_cfg.wandb_project,
         wandb_run_name=run_cfg.wandb_run_name,
         wandb_mode=run_cfg.wandb_mode,
+        checkpoint_dir=run_cfg.checkpoint_dir,
     )
 
     model = SchmidhuberLinear(model_cfg)
     model = model.to(torch.device(run_cfg.device))
+    print(f"Created model with {model.num_parameters()} parameters")
 
     flat_train = flatten_token_dataset(run_cfg.dataset_repo_id, run_cfg.dataset_split)
 
@@ -91,6 +93,7 @@ def main(cfg: TrainScriptConfig) -> None:
         num_workers=run_cfg.num_workers,
     )
 
+    print("Starting training...")
     try:
         Trainer(trainer_cfg, model).train(loader)
     except Exception:
