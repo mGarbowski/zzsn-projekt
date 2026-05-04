@@ -1,6 +1,7 @@
 # scripts/train.py
 import sys
 import traceback
+from pathlib import Path
 
 import hydra
 import torch
@@ -77,7 +78,7 @@ def main(cfg: TrainScriptConfig) -> None:
         wandb_project=run_cfg.wandb_project,
         wandb_run_name=run_cfg.wandb_run_name,
         wandb_mode=run_cfg.wandb_mode,
-        checkpoint_dir=run_cfg.checkpoint_dir,
+        checkpoint_dir=Path(run_cfg.checkpoint_dir),
     )
 
     model = SchmidhuberLinear(model_cfg)

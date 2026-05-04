@@ -36,9 +36,12 @@ class TrainScriptConfig:
     wandb_project: str = "zzsn-projekt"
     wandb_run_name: Optional[str] = None
     wandb_mode: str = "online"  # online | offline | disabled
-    checkpoint_dir: str = SCRATCH_ROOT / "checkpoints"
+    checkpoint_dir: Optional[str] = None
 
     def __post_init__(self) -> None:
+        if self.checkpoint_dir is None:
+            self.checkpoint_dir = str(SCRATCH_ROOT / "checkpoints")
+
         if self.batch_size <= 0:
             raise ValueError("batch_size must be > 0")
         if self.num_epochs <= 0:
