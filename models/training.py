@@ -18,6 +18,7 @@ class TrainerConfig:
     reconstruction_loss_weight: float
     dataset_repo_id: str
     checkpoint_dir: str
+    device: str = "cuda" if torch.cuda.is_available() else "cpu"
     wandb_project: str = "zzsn-projekt"
     wandb_run_name: str | None = None
     wandb_mode: str = "online"  # "online", "offline", or "disabled"
@@ -50,6 +51,9 @@ class Trainer:
             },
         )
 
+        device = torch.device(self.cfg.device)
+        self.model.to(device)
+
         mse = torch.nn.MSELoss()
         optimizer_predictors = torch.optim.Adam(
             params=self.model.shared_predictor.parameters(),
@@ -74,7 +78,7 @@ class Trainer:
                 self.model.freeze_autoencoder()
                 self.model.unfreeze_predictors()
                 for batch in data_loader:
-                    xs = batch["activations"]  # (batch_size, input_dim)
+                    xs = batch["activations"].to(device)  # (batch_size, input_dim)
 
                     with torch.no_grad():
                         sparse_representations = self.model.encoder(xs)
@@ -100,7 +104,7 @@ class Trainer:
                 self.model.freeze_predictors()
                 self.model.unfreeze_autoencoder()
                 for batch in data_loader:
-                    xs = batch["activations"]  # (batch_size, input_dim)
+                    xs = batch["activations"].to(device)  # (batch_size, input_dim)
 
                     sparse_representations = self.model.encoder(xs)
                     reconstructions = self.model.decoder(sparse_representations)

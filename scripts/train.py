@@ -79,6 +79,7 @@ def main(cfg: TrainScriptConfig) -> None:
         wandb_run_name=run_cfg.wandb_run_name,
         wandb_mode=run_cfg.wandb_mode,
         checkpoint_dir=Path(run_cfg.checkpoint_dir),
+        device=run_cfg.device,
     )
 
     model = SchmidhuberLinear(model_cfg)
