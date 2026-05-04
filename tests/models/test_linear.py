@@ -1,7 +1,11 @@
 import pytest
 import torch
 
-from models.linear import SchmidhuberLinear, SchmidhuberLinearConfig, SchmidhuberSharedPredictor
+from models.linear import (
+    SchmidhuberLinear,
+    SchmidhuberLinearConfig,
+    SchmidhuberSharedPredictor,
+)
 
 
 @pytest.fixture
@@ -11,8 +15,9 @@ def config():
         expansion_factor=4,
         predictor_dropout=0.1,
         predictor_hidden_dims=[16, 16],
-        predictor_embedding_dim=8
+        predictor_embedding_dim=8,
     )
+
 
 @pytest.fixture
 def model(config):
@@ -23,9 +28,11 @@ def model(config):
 def batch_size():
     return 10
 
+
 @pytest.fixture
 def batch(config, batch_size):
     return torch.rand((batch_size, config.input_dim))
+
 
 class TestSchmidhuberLinear:
     def test_encode_shape(self, model, batch, batch_size):
@@ -50,10 +57,10 @@ class TestSchmidhuberSharedPredictor:
         hidden_dims = [16, 16]
         embedding_dim = 8
         predictor = SchmidhuberSharedPredictor(
-            dictionary_dim=dictionary_dim, 
-            mlp_hidden_dims=hidden_dims, 
-            mlp_dropout=0.1, 
-            index_embedding_dim=embedding_dim
+            dictionary_dim=dictionary_dim,
+            mlp_hidden_dims=hidden_dims,
+            mlp_dropout=0.1,
+            index_embedding_dim=embedding_dim,
         )
 
         sparse_representation = torch.rand((batch_size, dictionary_dim))

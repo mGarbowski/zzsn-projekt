@@ -112,11 +112,13 @@ def _(data):
             flat_timesteps.append(timestep)
             flat_prompts.append(prompt)
 
-    flat_train = Dataset.from_dict({
-        "activations": flat_activations,
-        "timestep": flat_timesteps,
-        "prompt": flat_prompts,
-    }).with_format("torch")
+    flat_train = Dataset.from_dict(
+        {
+            "activations": flat_activations,
+            "timestep": flat_timesteps,
+            "prompt": flat_prompts,
+        }
+    ).with_format("torch")
     return (flat_train,)
 
 

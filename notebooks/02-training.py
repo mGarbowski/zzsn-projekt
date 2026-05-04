@@ -32,7 +32,7 @@ def _(SchmidhuberLinearConfig, TrainerConfig):
         expansion_factor=2,
         predictor_hidden_dims=[256],
         predictor_dropout=0.3,
-        predictor_embedding_dim=128
+        predictor_embedding_dim=128,
     )
 
     trainer_config = TrainerConfig(
@@ -70,7 +70,6 @@ def _(Dataset, load_dataset, trainer_config):
     data = load_dataset(trainer_config.dataset_repo_id)
     data = data.with_format("pytorch")
 
-
     flat_activations = []
     flat_timesteps = []
     flat_prompts = []
@@ -85,17 +84,21 @@ def _(Dataset, load_dataset, trainer_config):
             flat_timesteps.append(timestep)
             flat_prompts.append(prompt)
 
-    flat_train = Dataset.from_dict({
-        "activations": flat_activations,
-        "timestep": flat_timesteps,
-        "prompt": flat_prompts,
-    }).with_format("torch")
+    flat_train = Dataset.from_dict(
+        {
+            "activations": flat_activations,
+            "timestep": flat_timesteps,
+            "prompt": flat_prompts,
+        }
+    ).with_format("torch")
     return (flat_train,)
 
 
 @app.cell
 def _(flat_train, torch, trainer_config):
-    loader = torch.utils.data.DataLoader(flat_train, batch_size=trainer_config.batch_size)
+    loader = torch.utils.data.DataLoader(
+        flat_train, batch_size=trainer_config.batch_size
+    )
     batch = next(iter(loader))
     batch
     return batch, loader
@@ -116,7 +119,7 @@ def _(Trainer, model, trainer_config):
 
 @app.cell
 def _(loader, trainer):
-    results = trainer.train(loader)
+    _ = trainer.train(loader)
     return
 
 

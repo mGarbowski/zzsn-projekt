@@ -313,13 +313,19 @@ class CacheActivationsRunner:
 
     def load_and_push_to_hub(self) -> None:
         """Upload previously cached activations to HuggingFace Hub.
-        
+
         Uploading the dataset for one layer (hook name).
         """
         assert self.cfg.new_cached_activations_path is not None
-        assert self.cfg.hf_repo_id is not None, "Provide huggingface repo id in config to push to hub"
-        assert len(self.cfg.hook_names) == 1, "Can only upload one dataset at a time using this method"
-        dataset_path = f"{self.cfg.new_cached_activations_path}/{self.cfg.hook_names[0]}"
+        assert self.cfg.hf_repo_id is not None, (
+            "Provide huggingface repo id in config to push to hub"
+        )
+        assert len(self.cfg.hook_names) == 1, (
+            "Can only upload one dataset at a time using this method"
+        )
+        dataset_path = (
+            f"{self.cfg.new_cached_activations_path}/{self.cfg.hook_names[0]}"
+        )
         dataset = Dataset.load_from_disk(dataset_path)
         if self.accelerator.is_main_process:
             print("Loaded dataset from disk")

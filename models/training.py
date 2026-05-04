@@ -54,7 +54,8 @@ class Trainer:
             lr=self.cfg.learning_rate_predictors,
         )
         optimizer_autoencoder = torch.optim.Adam(
-            params=list(self.model.encoder.parameters()) + list(self.model.decoder.parameters()),
+            params=list(self.model.encoder.parameters())
+            + list(self.model.decoder.parameters()),
             lr=self.cfg.learning_rate_autoencoder,
         )
         predictor_losses = []
@@ -67,7 +68,6 @@ class Trainer:
         global_step = 0
         try:
             for epoch_idx in tqdm(range(self.cfg.num_epochs), desc="Epochs"):
-
                 # predictors update
                 self.model.freeze_autoencoder()
                 self.model.unfreeze_predictors()
@@ -106,7 +106,10 @@ class Trainer:
 
                     reconstruction_loss = mse(reconstructions, xs)
                     predictability_loss = mse(predictions, sparse_representations)
-                    autoencoder_loss = self.cfg.reconstruction_loss_weight * reconstruction_loss - predictability_loss
+                    autoencoder_loss = (
+                        self.cfg.reconstruction_loss_weight * reconstruction_loss
+                        - predictability_loss
+                    )
 
                     reconstruction_losses.append(reconstruction_loss.item())
                     predictability_losses.append(predictability_loss.item())

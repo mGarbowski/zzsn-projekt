@@ -1,8 +1,15 @@
 from typing import Callable, Dict, List, Optional, Union
 
 import torch
-from diffusers import DDIMScheduler, DiffusionPipeline, IFPipeline, StableDiffusionXLPipeline
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import retrieve_timesteps
+from diffusers import (
+    DDIMScheduler,
+    DiffusionPipeline,
+    IFPipeline,
+    StableDiffusionXLPipeline,
+)
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
+    retrieve_timesteps,
+)
 from loguru import logger
 
 from .hooked_scheduler import HookedNoiseScheduler
@@ -72,13 +79,22 @@ class HookedDiffusionAbstractPipeline:
         try:
             prompt_embeds, timesteps, latents, extra_step_kwargs, added_cond_kwargs = (
                 self._prepare_prompt(
-                    prompt, device, num_images_per_prompt, guidance_scale,
-                    num_inference_steps, generator, latents,
+                    prompt,
+                    device,
+                    num_images_per_prompt,
+                    guidance_scale,
+                    num_inference_steps,
+                    generator,
+                    latents,
                 )
             )
             latents = self._denoise_loop(
-                timesteps, latents, guidance_scale, extra_step_kwargs,
-                added_cond_kwargs, prompt_embeds,
+                timesteps,
+                latents,
+                guidance_scale,
+                extra_step_kwargs,
+                added_cond_kwargs,
+                prompt_embeds,
             )
             image = self._postprocess_latents(latents, output_type, generator)
         finally:
@@ -113,20 +129,31 @@ class HookedDiffusionAbstractPipeline:
             dict() if save_output else None,
         )
         hooks = [
-            self._register_cache_hook(position, cache_input, cache_output, unconditional)
+            self._register_cache_hook(
+                position, cache_input, cache_output, unconditional
+            )
             for position in positions_to_cache
         ]
         hooks = [hook for hook in hooks if hook is not None]
 
         prompt_embeds, timesteps, latents, extra_step_kwargs, added_cond_kwargs = (
             self._prepare_prompt(
-                prompt, device, num_images_per_prompt, guidance_scale,
-                num_inference_steps, generator, latents,
+                prompt,
+                device,
+                num_images_per_prompt,
+                guidance_scale,
+                num_inference_steps,
+                generator,
+                latents,
             )
         )
         latents = self._denoise_loop(
-            timesteps, latents, guidance_scale, extra_step_kwargs,
-            added_cond_kwargs, prompt_embeds,
+            timesteps,
+            latents,
+            guidance_scale,
+            extra_step_kwargs,
+            added_cond_kwargs,
+            prompt_embeds,
         )
 
         for hook in hooks:
@@ -192,12 +219,16 @@ class HookedDiffusionAbstractPipeline:
     def _register_general_hook(self, position, hook):
         if position == "scheduler_pre":
             if not self.use_hooked_scheduler:
-                raise ValueError("Cannot register hooks on scheduler without using hooked scheduler")
+                raise ValueError(
+                    "Cannot register hooks on scheduler without using hooked scheduler"
+                )
             self.pipe.scheduler.pre_hooks.append(hook)
             return
         elif position == "scheduler_post":
             if not self.use_hooked_scheduler:
-                raise ValueError("Cannot register hooks on scheduler without using hooked scheduler")
+                raise ValueError(
+                    "Cannot register hooks on scheduler without using hooked scheduler"
+                )
             self.pipe.scheduler.post_hooks.append(hook)
             return
 
@@ -205,8 +236,14 @@ class HookedDiffusionAbstractPipeline:
         return block.register_forward_hook(hook)
 
     def _prepare_prompt(
-        self, prompt, device, num_images_per_prompt, guidance_scale,
-        num_inference_steps, generator, latents,
+        self,
+        prompt,
+        device,
+        num_images_per_prompt,
+        guidance_scale,
+        num_inference_steps,
+        generator,
+        latents,
     ):
         height = self.pipe.unet.config.sample_size * self.pipe.vae_scale_factor
         width = self.pipe.unet.config.sample_size * self.pipe.vae_scale_factor
@@ -217,9 +254,15 @@ class HookedDiffusionAbstractPipeline:
             batch_size = len(prompt)
 
         prompt_embeds, negative_prompt_embeds = self.pipe.encode_prompt(
-            prompt, device, num_images_per_prompt, guidance_scale > 1.0, None,
-            prompt_embeds=None, negative_prompt_embeds=None,
-            lora_scale=None, clip_skip=None,
+            prompt,
+            device,
+            num_images_per_prompt,
+            guidance_scale > 1.0,
+            None,
+            prompt_embeds=None,
+            negative_prompt_embeds=None,
+            lora_scale=None,
+            clip_skip=None,
         )
         if guidance_scale > 1.0:
             prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds])
@@ -230,33 +273,51 @@ class HookedDiffusionAbstractPipeline:
 
         num_channels_latents = self.pipe.unet.config.in_channels
         latents = self.pipe.prepare_latents(
-            batch_size * num_images_per_prompt, num_channels_latents,
-            height, width, prompt_embeds.dtype, device, generator, latents,
+            batch_size * num_images_per_prompt,
+            num_channels_latents,
+            height,
+            width,
+            prompt_embeds.dtype,
+            device,
+            generator,
+            latents,
         )
 
         extra_step_kwargs = self.pipe.prepare_extra_step_kwargs(generator, 0.0)
         return prompt_embeds, timesteps, latents, extra_step_kwargs, None
 
     def _denoise_loop(
-        self, timesteps, latents, guidance_scale, extra_step_kwargs,
-        added_cond_kwargs, prompt_embeds,
+        self,
+        timesteps,
+        latents,
+        guidance_scale,
+        extra_step_kwargs,
+        added_cond_kwargs,
+        prompt_embeds,
     ):
         for t in timesteps:
             latent_model_input = (
                 torch.cat([latents] * 2) if guidance_scale > 1.0 else latents
             )
-            latent_model_input = self.pipe.scheduler.scale_model_input(latent_model_input, t)
+            latent_model_input = self.pipe.scheduler.scale_model_input(
+                latent_model_input, t
+            )
 
             noise_pred = self.pipe.unet(
-                latent_model_input, t,
+                latent_model_input,
+                t,
                 encoder_hidden_states=prompt_embeds,
-                timestep_cond=None, cross_attention_kwargs=None,
-                added_cond_kwargs=added_cond_kwargs, return_dict=False,
+                timestep_cond=None,
+                cross_attention_kwargs=None,
+                added_cond_kwargs=added_cond_kwargs,
+                return_dict=False,
             )[0]
 
             if guidance_scale > 1.0:
                 noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                noise_pred = noise_pred_uncond + guidance_scale * (
+                    noise_pred_text - noise_pred_uncond
+                )
 
             latents = self.pipe.scheduler.step(
                 noise_pred, t, latents, **extra_step_kwargs, return_dict=False
@@ -267,7 +328,8 @@ class HookedDiffusionAbstractPipeline:
         if output_type != "latent":
             image = self.pipe.vae.decode(
                 latents / self.pipe.vae.config.scaling_factor,
-                return_dict=False, generator=generator,
+                return_dict=False,
+                generator=generator,
             )[0]
         else:
             image = latents

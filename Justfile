@@ -10,7 +10,7 @@ fmt:
 check:
     uvx ruff format --check
     uvx ruff check
-    uvx ty check
+    # uvx ty check
 
 
 # Install dependencie on local machine

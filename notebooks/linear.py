@@ -34,13 +34,13 @@ def _(k, vec):
 
 @app.cell
 def _(k, vec):
-    vec[k+1:]
+    vec[k + 1 :]
     return
 
 
 @app.cell
 def _(k, torch, vec):
-    without_k = torch.cat([vec[:k], vec[k+1:]])
+    without_k = torch.cat([vec[:k], vec[k + 1 :]])
     without_k
     return (without_k,)
 
@@ -66,13 +66,13 @@ def _(k, vec_batch):
 
 @app.cell
 def _(k, vec_batch):
-    vec_batch[:, k+1:]
+    vec_batch[:, k + 1 :]
     return
 
 
 @app.cell
 def _(k, torch, vec_batch):
-    res_batch = torch.cat([vec_batch[:, :k], vec_batch[:, k+1:]], dim=1)
+    res_batch = torch.cat([vec_batch[:, :k], vec_batch[:, k + 1 :]], dim=1)
     res_batch
     return (res_batch,)
 
@@ -112,6 +112,7 @@ def _():
 @app.cell
 def _():
     import os
+
     os.getcwd()
     return
 
@@ -122,7 +123,7 @@ def _(SchmidhuberLinear, SchmidhuberLinearConfig):
         input_dim=16,
         expansion_factor=4,
         predictor_dropout=0.1,
-        predictor_hidden_dims=[16, 16]
+        predictor_hidden_dims=[16, 16],
     )
     model = SchmidhuberLinear(cfg)
     return cfg, model
