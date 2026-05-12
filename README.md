@@ -4,7 +4,6 @@
 ## TODO
 * Zebrać większy zbiór
   * wiele obrazków per prompt?
-* Trening powinien sie zaczynać od fazy autokodera
 * Popawić skrypt do zbierania aktywacji żeby zapisywał już spłaszczony dataset
 * Obsłużyć sweep hiperparametrów z wandb
 
