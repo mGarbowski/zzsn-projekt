@@ -31,6 +31,7 @@ def main(cfg: TrainScriptConfig) -> None:
 
         data_source_cfg = DataSourceConfig(
             dataset_repo_id=run_cfg.dataset_repo_id,
+            dataset_split=run_cfg.dataset_split,
             batch_size=run_cfg.batch_size,
             num_workers=run_cfg.num_workers,
             shuffle=run_cfg.shuffle,
