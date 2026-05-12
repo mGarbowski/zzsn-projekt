@@ -62,7 +62,7 @@ class Trainer:
             project=self.cfg.wandb_project,
             name=self.cfg.wandb_run_name,
             mode=self.cfg.wandb_mode,
-            config=asdict(self.cfg.model_config),
+            config=asdict(self.cfg),
         )
 
         try:
