@@ -3,7 +3,14 @@
 
 ## TODO
 * Zebrać większy zbiór
+  * aktualnie 1000 promptów
   * wiele obrazków per prompt?
+  * da się to puścić równolegle na wiele GPU?
+* Zaimplementować interwencję w generacje obrazków
+  * dyfuzja spięta z wytrenowanym modelem
+  * hook na przepuszczenie aktywacji przez model, zmianę ustalonych wymiarów i przepuszczenie z powrotem
+* Jak oceniać jakość modelu
+  * żeby robić sweep(?)
 * Obsłużyć sweep hiperparametrów z wandb
 
 Do dalszych eksperymentów
