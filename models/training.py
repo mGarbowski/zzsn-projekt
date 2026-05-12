@@ -12,6 +12,8 @@ import wandb
 class TrainerConfig:
     model_config: SchmidhuberLinearConfig
     batch_size: int
+    batches_per_phase: int
+    """Number of batches for each training phase (autoencoder or predictor) before switching to the other phase."""
     num_epochs: int
     learning_rate_predictors: float
     learning_rate_autoencoder: float
@@ -72,69 +74,76 @@ class Trainer:
         autoencoder_losses = []
 
         global_step = 0
+        phase = "autoencoder"
         try:
             for epoch_idx in tqdm(range(self.cfg.num_epochs), desc="Epochs"):
-                # predictors update
-                self.model.freeze_autoencoder()
-                self.model.unfreeze_predictors()
-                for batch in data_loader:
-                    xs = batch["activations"].to(device)  # (batch_size, input_dim)
+                for batch_idx, batch in enumerate(tqdm(data_loader, desc="Batches")):
+                    # Switch phase
+                    if batch_idx % self.cfg.batches_per_phase == 0:
+                        if phase == "autoencoder":
+                            phase = "predictor"
+                            self.model.freeze_autoencoder()
+                            self.model.unfreeze_predictors()
+                        else:
+                            phase = "autoencoder"
+                            self.model.freeze_predictors()
+                            self.model.unfreeze_autoencoder()
 
-                    with torch.no_grad():
+                    if phase == "predictor":
+                        xs = batch["activations"].to(device)  # (batch_size, input_dim)
+
+                        with torch.no_grad():
+                            sparse_representations = self.model.encoder(xs)
+
+                        predictions = self.model.predict_all(sparse_representations)
+                        predictor_loss = mse(predictions, sparse_representations)
+                        predictor_losses.append(predictor_loss.item())
+
+                        optimizer_predictors.zero_grad()
+                        predictor_loss.backward()
+                        optimizer_predictors.step()
+
+                        wandb.log(
+                            {
+                                "train/predictor_loss": predictor_loss.item(),
+                                "epoch": epoch_idx,
+                            },
+                            step=global_step,
+                        )
+                        global_step += 1
+
+                    else:
+                        xs = batch["activations"].to(device)  # (batch_size, input_dim)
+
                         sparse_representations = self.model.encoder(xs)
+                        reconstructions = self.model.decoder(sparse_representations)
+                        predictions = self.model.predict_all(sparse_representations)
 
-                    predictions = self.model.predict_all(sparse_representations)
-                    predictor_loss = mse(predictions, sparse_representations)
-                    predictor_losses.append(predictor_loss.item())
+                        reconstruction_loss = mse(reconstructions, xs)
+                        predictability_loss = mse(predictions, sparse_representations)
+                        autoencoder_loss = (
+                            self.cfg.reconstruction_loss_weight * reconstruction_loss
+                            - predictability_loss
+                        )
 
-                    optimizer_predictors.zero_grad()
-                    predictor_loss.backward()
-                    optimizer_predictors.step()
+                        reconstruction_losses.append(reconstruction_loss.item())
+                        predictability_losses.append(predictability_loss.item())
+                        autoencoder_losses.append(autoencoder_loss.item())
 
-                    wandb.log(
-                        {
-                            "train/predictor_loss": predictor_loss.item(),
-                            "epoch": epoch_idx,
-                        },
-                        step=global_step,
-                    )
-                    global_step += 1
+                        optimizer_autoencoder.zero_grad()
+                        autoencoder_loss.backward()
+                        optimizer_autoencoder.step()
 
-                # autoencoder update
-                self.model.freeze_predictors()
-                self.model.unfreeze_autoencoder()
-                for batch in data_loader:
-                    xs = batch["activations"].to(device)  # (batch_size, input_dim)
-
-                    sparse_representations = self.model.encoder(xs)
-                    reconstructions = self.model.decoder(sparse_representations)
-                    predictions = self.model.predict_all(sparse_representations)
-
-                    reconstruction_loss = mse(reconstructions, xs)
-                    predictability_loss = mse(predictions, sparse_representations)
-                    autoencoder_loss = (
-                        self.cfg.reconstruction_loss_weight * reconstruction_loss
-                        - predictability_loss
-                    )
-
-                    reconstruction_losses.append(reconstruction_loss.item())
-                    predictability_losses.append(predictability_loss.item())
-                    autoencoder_losses.append(autoencoder_loss.item())
-
-                    optimizer_autoencoder.zero_grad()
-                    autoencoder_loss.backward()
-                    optimizer_autoencoder.step()
-
-                    wandb.log(
-                        {
-                            "train/reconstruction_loss": reconstruction_loss.item(),
-                            "train/predictability_loss": predictability_loss.item(),
-                            "train/autoencoder_loss": autoencoder_loss.item(),
-                            "epoch": epoch_idx,
-                        },
-                        step=global_step,
-                    )
-                    global_step += 1
+                        wandb.log(
+                            {
+                                "train/reconstruction_loss": reconstruction_loss.item(),
+                                "train/predictability_loss": predictability_loss.item(),
+                                "train/autoencoder_loss": autoencoder_loss.item(),
+                                "epoch": epoch_idx,
+                            },
+                            step=global_step,
+                        )
+                        global_step += 1
 
                 self.save_checkpoint(epoch_idx)
 

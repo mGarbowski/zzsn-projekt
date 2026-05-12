@@ -27,6 +27,7 @@ def trainer_config(model_config, tmp_path):
     return TrainerConfig(
         model_config=model_config,
         batch_size=4,
+        batches_per_phase=5,
         num_epochs=2,
         learning_rate_predictors=1e-3,
         learning_rate_autoencoder=1e-3,

@@ -70,6 +70,7 @@ def main(cfg: TrainScriptConfig) -> None:
         trainer_cfg = TrainerConfig(
             model_config=model_cfg,
             batch_size=run_cfg.batch_size,
+            batches_per_phase=run_cfg.batches_per_phase,
             num_epochs=run_cfg.num_epochs,
             learning_rate_predictors=run_cfg.learning_rate_predictors,
             learning_rate_autoencoder=run_cfg.learning_rate_autoencoder,

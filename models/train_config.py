@@ -17,6 +17,7 @@ class TrainScriptConfig:
 
     # trainer config
     batch_size: int = 32
+    batches_per_phase: int = 16
     num_epochs: int = 3
     learning_rate_predictors: float = 4e-4
     learning_rate_autoencoder: float = 1e-4
@@ -44,6 +45,8 @@ class TrainScriptConfig:
 
         if self.batch_size <= 0:
             raise ValueError("batch_size must be > 0")
+        if self.batches_per_phase <= 0:
+            raise ValueError("batches_per_phase must be > 0")
         if self.num_epochs <= 0:
             raise ValueError("num_epochs must be > 0")
         if self.learning_rate_predictors <= 0:
