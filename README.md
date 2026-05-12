@@ -9,6 +9,7 @@
   * co jeden batch?
   * co (hiperparametr) batchy?
 * Popawić skrypt do zbierania aktywacji żeby zapisywał już spłaszczony dataset
+* Obsłużyć sweep hiperparametrów z wandb
 
 Do dalszych eksperymentów
 
