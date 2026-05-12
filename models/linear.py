@@ -33,7 +33,7 @@ class SchmidhuberLinear(nn.Module):
             in_features=self.dictionary_dim, out_features=config.input_dim
         )
 
-        # Same predictor reused multiple times (once per dictionary dimension)
+        # Same predictor reused for all dimension with masking
         self.shared_predictor = SchmidhuberSharedPredictor(
             dictionary_dim=self.dictionary_dim,
             mlp_hidden_dims=config.predictor_hidden_dims,
@@ -41,24 +41,35 @@ class SchmidhuberLinear(nn.Module):
             index_embedding_dim=config.predictor_embedding_dim,
         )
 
-    # TODO batching
     def predict_all(self, sparse_representation: torch.Tensor) -> torch.Tensor:
         """Predict all dimensions using the shared predictor.
 
         Takes in a batch of sparse representations (batch_dim, dictionary_dim).
-        Return batch of predictions (batch_dim, dictionary_dim)
+        Returns a batch of predictions (batch_dim, dictionary_dim).
+
+        The predictor takes in the sparse vector and dimension index k (from range [0, dictionary_dim-1]),
+        masks the k-th element of the sparse vector and predicts its value based on the rest of the vector and the dimension index.
+
+        This calculation is batched, a single pass computes the predictions for all dimensions for all sparse vector in the mini-batch.
         """
         batch_size, _ = sparse_representation.shape
-        results = []
-        for k in range(self.dictionary_dim):
-            ks = torch.full(
-                (batch_size,), k, dtype=torch.long, device=sparse_representation.device
-            )
-            k_prediction = self.shared_predictor(
-                sparse_representation, predicted_dim_idx=ks
-            )
-            results.append(k_prediction)
-        return torch.cat(results, dim=-1)  # (batch_dim, dictionary_dim)
+        device = sparse_representation.device
+
+        # Repeat each sparse vector dictionary_dim times
+        # [x1, x1, ..., x1, x2, x2, ..., x2, ...]
+        # Shape (batch_size * dictionary_dim, dictionary_dim)
+        repeated = sparse_representation.repeat_interleave(self.dictionary_dim, dim=0)
+
+        # Index of the dimension to mask and predict
+        # [0, 1, 2, ..., D-1, 0, 1, 2, ..., D-1, ...]
+        # Shape (batch_size * dictionary_dim,)
+        predicted_dim_idx = torch.arange(self.dictionary_dim, device=device).repeat(
+            batch_size
+        )
+
+        preds = self.shared_predictor(repeated, predicted_dim_idx)  # (B*D, 1)
+        preds = preds.squeeze(-1).view(batch_size, self.dictionary_dim)  # (B, D)
+        return preds
 
     def num_parameters(self) -> int:
         """Return the total number of parameters in the model."""
@@ -95,6 +106,7 @@ class SchmidhuberLinear(nn.Module):
         self.shared_predictor.train()
 
 
+# Alternatywa - hypernetwork
 class SchmidhuberSharedPredictor(nn.Module):
     """One network is reused for predicting each of the dictionary dimensions
 
