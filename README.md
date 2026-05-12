@@ -4,7 +4,6 @@
 ## TODO
 * Zebrać większy zbiór
   * wiele obrazków per prompt?
-* Popawić skrypt do zbierania aktywacji żeby zapisywał już spłaszczony dataset
 * Obsłużyć sweep hiperparametrów z wandb
 
 Do dalszych eksperymentów

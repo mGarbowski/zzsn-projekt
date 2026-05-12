@@ -7,7 +7,7 @@ from pathlib import Path
 
 import torch
 from accelerate import Accelerator
-from datasets import Array2D, Dataset, Features, Value, load_dataset
+from datasets import Dataset, Features, Sequence, Value, load_dataset
 from datasets.fingerprint import generate_fingerprint
 from huggingface_hub import HfApi
 from loguru import logger
@@ -183,11 +183,12 @@ class CacheActivationsRunner:
         buffer = buffer[:, :: self.cfg.cache_every_n_timesteps, :, :]
         n_steps = buffer.shape[1]
 
-        activations = buffer.reshape(-1, d_sample_size, d_in)
-        timesteps = self.scheduler_timesteps[
-            :: self.cfg.cache_every_n_timesteps
-        ].repeat(batch_size)
-        repeated_prompts = [prompt for prompt in prompts for _ in range(n_steps)]
+        activations = buffer.reshape(-1, d_in)
+        timesteps = self.scheduler_timesteps[:: self.cfg.cache_every_n_timesteps]
+        timesteps = timesteps.repeat_interleave(d_sample_size).repeat(batch_size)
+        repeated_prompts = [
+            prompt for prompt in prompts for _ in range(n_steps * d_sample_size)
+        ]
 
         return Dataset.from_dict(
             {
@@ -198,11 +199,11 @@ class CacheActivationsRunner:
             features=self.features_dict[hook_name],
         )
 
-    def create_dataset_feature(self, hook_name: str, d_in: int, d_out: int) -> None:
+    def create_dataset_feature(self, hook_name: str, d_in: int) -> None:
         self.features_dict[hook_name] = Features(
             {
-                "activations": Array2D(
-                    shape=(d_in, d_out), dtype=TORCH_STRING_DTYPE_MAP[self.cfg.dtype]
+                "activations": Sequence(
+                    Value(dtype=TORCH_STRING_DTYPE_MAP[self.cfg.dtype]), length=d_in
                 ),
                 "timestep": Value(dtype="uint16"),
                 "prompt": Value(dtype="string"),
@@ -262,9 +263,7 @@ class CacheActivationsRunner:
                     )
 
                     if self.features_dict[hook_name] is None:
-                        self.create_dataset_feature(
-                            hook_name, buffer.shape[-2], buffer.shape[-1]
-                        )
+                        self.create_dataset_feature(hook_name, buffer.shape[-1])
 
                     shard = self._create_shard(buffer, prompt, hook_name)
                     shard.save_to_disk(
