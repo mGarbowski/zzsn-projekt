@@ -5,3 +5,7 @@ multirun
 activations
 scratch
 data
+**__marimo__
+.idea
+.vscode
+wandb

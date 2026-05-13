@@ -91,7 +91,9 @@ def main(_: DictConfig):
                 if guidance_scale > 1.0:
                     latent_model_input = torch.cat([latents, latents], dim=0)
 
-                latent_model_input = pipe.scheduler.scale_model_input(latent_model_input, timestep)
+                latent_model_input = pipe.scheduler.scale_model_input(
+                    latent_model_input, timestep
+                )
 
                 with torch.no_grad():
                     noise_pred = pipe.unet(
@@ -102,7 +104,9 @@ def main(_: DictConfig):
 
                 if guidance_scale > 1.0:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                    noise_pred = noise_pred_uncond + guidance_scale * (
+                        noise_pred_text - noise_pred_uncond
+                    )
 
                 latents = pipe.scheduler.step(noise_pred, timestep, latents).prev_sample
 
@@ -114,7 +118,9 @@ def main(_: DictConfig):
                 prompt_records.append(
                     {
                         "step_index": step_index,
-                        "timestep": int(timestep.item()) if hasattr(timestep, "item") else int(timestep),
+                        "timestep": int(timestep.item())
+                        if hasattr(timestep, "item")
+                        else int(timestep),
                         "activation": step_state["activation"],
                     }
                 )
@@ -122,7 +128,9 @@ def main(_: DictConfig):
             hook_handle.remove()
 
         with torch.no_grad():
-            image_tensor = pipe.vae.decode(latents / pipe.vae.config.scaling_factor, return_dict=False)[0]
+            image_tensor = pipe.vae.decode(
+                latents / pipe.vae.config.scaling_factor, return_dict=False
+            )[0]
             image = pipe.image_processor.postprocess(image_tensor, output_type="pil")[0]
 
         image_path = images_dir / f"{prompt_index:02d}_{slugify(prompt)}.png"
