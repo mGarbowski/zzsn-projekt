@@ -103,11 +103,43 @@ class WrappedDiffusion:
         return output, dictionary_representations
 
     def generate_with_intervention(self, generation_param: GenerationParams, dictionary_multipliers: dict[int, float]):
-        pass
+        multipliers = self._multipliers_dict_to_tensor(dictionary_multipliers)
+        layer = self._locate_layer(self.layer_name)
+
+        def hook(module, inputs, output):
+            is_tuple = isinstance(output, tuple)
+            act = output[0] if is_tuple else output
+
+            B, C, H, W = act.shape
+            with torch.no_grad():
+                act_flat = act.permute(0, 2, 3, 1).reshape(B * H * W, C)
+                encoded = self.schmidhuber.encoder(act_flat)
+                encoded = encoded * multipliers.to(encoded.device)
+                decoded = self.schmidhuber.decoder(encoded)
+                modified = decoded.reshape(B, H, W, C).permute(0, 3, 1, 2)
+
+            return (modified,) + output[1:] if is_tuple else modified
+
+        handle = layer.register_forward_hook(hook)
+        try:
+            result = self.diffusion(
+                prompt=generation_param.prompt,
+                num_inference_steps=generation_param.num_inference_steps,
+                guidance_scale=generation_param.guidance_scale,
+            )
+        finally:
+            handle.remove()
+
+        return result
 
     def _multipliers_dict_to_tensor(self, dictionary_multipliers: dict[int, float]) -> torch.Tensor:
-        pass
+        tensor = torch.ones(self.schmidhuber.dictionary_dim)
+        for idx, multiplier in dictionary_multipliers.items():
+            tensor[idx] = multiplier
+        return tensor
 
     def _locate_layer(self, layer_name: str) -> nn.Module:
-        # TODO
-        return self.diffusion.unet.up_blocks[1].attentions[2]
+        block = self.diffusion
+        for step in layer_name.split("."):
+            block = block[int(step)] if step.isdigit() else getattr(block, step)
+        return block
