@@ -42,10 +42,65 @@ class WrappedDiffusion:
     def generate_and_collect_dictionary(self, generation_params: GenerationParams):
         dictionary_representations = []
 
+        layer = self._locate_layer(self.layer_name)
+
         def hook(module, inputs, output):
-            activations = output
-            encoded = self.schmidhuber.encode(activations)
-            dictionary_representations.append(encoded.detach().cpu())
+            act = output
+            # If output is a tuple (some modules return tuples), take the first tensor
+            if isinstance(act, tuple):
+                act = act[0]
+
+            # Expected shapes:
+            # - (B, C, H, W)  -> convert to (B, Npatch, C) where Npatch = H*W
+            # - (B, Npatch, C) -> use as-is
+
+            assert act.ndim == 4
+            B, C, H, W = act.shape
+            patches = act.view(B, C, H * W).permute(0, 2, 1)  # (B, Npatch, C)
+
+            # Handle guidance-duplication: if batch is doubled (uncond + cond),
+            # keep only conditioned half (second chunk).
+            if patches.shape[0] % 2 == 0 and generation_params.guidance_scale > 1.0:
+                try:
+                    uncond, cond = patches.chunk(2, dim=0)
+                    patches = cond
+                except Exception:
+                    # if chunk fails, keep patches as-is
+                    pass
+
+            B2, N, C = patches.shape
+            encoder = self.schmidhuber.encoder
+            device = next(encoder.parameters()).device
+
+            # Flatten patches to (B2 * N, C) and encode in one batch
+            patches_flat = patches.reshape(B2 * N, C).to(device)
+            with torch.no_grad():
+                encoded_flat = encoder(patches_flat)  # (B2 * N, dict_dim)
+
+            dict_dim = encoded_flat.shape[-1]
+            encoded = encoded_flat.view(B2, N, dict_dim)  # (B2, N, dict_dim)
+
+            # Average across patches to get a single vector per batch item
+            encoded_mean = encoded.mean(dim=1)  # (B2, dict_dim)
+
+            # Store detached CPU tensor
+            dictionary_representations.append(encoded_mean.detach().cpu())
+
+        handle = layer.register_forward_hook(hook)
+        try:
+            # Run generation under no_grad to avoid building graphs
+            with torch.no_grad():
+                output = self.diffusion(
+                    generation_params.prompt,
+                    num_inference_steps=generation_params.num_inference_steps,
+                    guidance_scale=generation_params.guidance_scale,
+                )
+        finally:
+            handle.remove()
+
+        # dictionary_representations is a list with one entry per hook invocation.
+        # Each entry is a tensor of shape (batch_after_guidance, dict_dim) on CPU.
+        return output, dictionary_representations
 
     def generate_with_intervention(self, generation_param: GenerationParams, dictionary_multipliers: dict[int, float]):
         pass
