@@ -12,6 +12,7 @@ class GenerationParams:
     prompt: str
     num_inference_steps: int
     guidance_scale: float
+    random_seed: int = 42
 
 class WrappedDiffusion:
     """Wraps StableDiffusion 1.4 to parse the activations with trained Schmidhuber model
@@ -122,10 +123,13 @@ class WrappedDiffusion:
 
         handle = layer.register_forward_hook(hook)
         try:
+            rng = torch.Generator(device=self.diffusion.device)
+            rng.manual_seed(generation_param.random_seed)
             result = self.diffusion(
                 prompt=generation_param.prompt,
                 num_inference_steps=generation_param.num_inference_steps,
                 guidance_scale=generation_param.guidance_scale,
+                generator=rng
             )
         finally:
             handle.remove()
