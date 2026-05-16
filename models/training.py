@@ -166,6 +166,7 @@ class Trainer:
             step=self.global_step,
         )
 
+    # TODO save model configuration as well
     def save_checkpoint(self, epoch_idx: int):
         checkpoint_dir = Path(f"{self.cfg.checkpoint_dir}/{wandb.run.id}")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
