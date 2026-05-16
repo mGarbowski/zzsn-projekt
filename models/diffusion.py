@@ -114,16 +114,20 @@ class WrappedDiffusion:
             B, C, H, W = act.shape
             with torch.no_grad():
                 encoder = self.schmidhuber.encoder
-                encoder_device = next(encoder.parameters()).device
-                encoder_dtype = next(encoder.parameters()).dtype
+                decoder = self.schmidhuber.decoder
+                param = next(self.schmidhuber.parameters())
+                model_device = param.device
+                model_dtype = param.dtype
 
                 act_flat = act.permute(0, 2, 3, 1).reshape(B * H * W, C)
-                act_flat = act_flat.to(device=encoder_device, dtype=encoder_dtype)
+                act_flat = act_flat.to(device=model_device, dtype=model_dtype)
 
                 encoded = encoder(act_flat)
 
-                encoded = encoded * multipliers.to(encoded.device)
-                decoded = self.schmidhuber.decoder(encoded)
+                multipliers_tensor = multipliers.to(device=encoded.device, dtype=encoded.dtype)
+                encoded = encoded * multipliers_tensor
+
+                decoded = decoder(encoded)
                 modified = decoded.reshape(B, H, W, C).permute(0, 3, 1, 2)
 
             return (modified,) + output[1:] if is_tuple else modified
@@ -144,7 +148,12 @@ class WrappedDiffusion:
         return result
 
     def _multipliers_dict_to_tensor(self, dictionary_multipliers: dict[int, float]) -> torch.Tensor:
-        tensor = torch.ones(self.schmidhuber.dictionary_dim)
+        param = next(self.schmidhuber.parameters())
+        tensor = torch.ones(
+            self.schmidhuber.dictionary_dim,
+            device=param.device,
+            dtype=param.dtype,
+        )
         for idx, multiplier in dictionary_multipliers.items():
             tensor[idx] = multiplier
         return tensor
