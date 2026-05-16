@@ -103,6 +103,16 @@ class WrappedDiffusion:
         # Each entry is a tensor of shape (batch_after_guidance, dict_dim) on CPU.
         return output, dictionary_representations
 
+    def generate(self, generation_param: GenerationParams):
+        rng = torch.Generator(device=self.diffusion.device)
+        rng.manual_seed(generation_param.random_seed)
+        return self.diffusion(
+            prompt=generation_param.prompt,
+            num_inference_steps=generation_param.num_inference_steps,
+            guidance_scale=generation_param.guidance_scale,
+            generator=rng
+        )
+
     def generate_with_intervention(self, generation_param: GenerationParams, dictionary_multipliers: dict[int, float]):
         multipliers = self._multipliers_dict_to_tensor(dictionary_multipliers)
         layer = self._locate_layer(self.layer_name)
@@ -134,14 +144,7 @@ class WrappedDiffusion:
 
         handle = layer.register_forward_hook(hook)
         try:
-            rng = torch.Generator(device=self.diffusion.device)
-            rng.manual_seed(generation_param.random_seed)
-            result = self.diffusion(
-                prompt=generation_param.prompt,
-                num_inference_steps=generation_param.num_inference_steps,
-                guidance_scale=generation_param.guidance_scale,
-                generator=rng
-            )
+            result = self.generate(generation_param)
         finally:
             handle.remove()
 
