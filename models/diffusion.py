@@ -113,8 +113,15 @@ class WrappedDiffusion:
 
             B, C, H, W = act.shape
             with torch.no_grad():
+                encoder = self.schmidhuber.encoder
+                encoder_device = next(encoder.parameters()).device
+                encoder_dtype = next(encoder.parameters()).dtype
+
                 act_flat = act.permute(0, 2, 3, 1).reshape(B * H * W, C)
-                encoded = self.schmidhuber.encoder(act_flat)
+                act_flat = act_flat.to(device=encoder_device, dtype=encoder_dtype)
+
+                encoded = encoder(act_flat)
+
                 encoded = encoded * multipliers.to(encoded.device)
                 decoded = self.schmidhuber.decoder(encoded)
                 modified = decoded.reshape(B, H, W, C).permute(0, 3, 1, 2)
