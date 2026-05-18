@@ -1,7 +1,9 @@
 from dataclasses import dataclass
+from itertools import islice
 
 import torch
 from diffusers import StableDiffusionPipeline
+from PIL.Image import Image
 from torch import nn
 
 from models.linear import SchmidhuberLinear
@@ -9,10 +11,27 @@ from models.linear import SchmidhuberLinear
 
 @dataclass
 class GenerationParams:
-    prompt: str
+    prompts: list[str]
+    num_seeds: int  # seeds 0..num_seeds-1 are tried for every prompt
     num_inference_steps: int
     guidance_scale: float
-    random_seed: int = 42
+
+
+@dataclass
+class GenerationResult:
+    prompt: str
+    seed: int
+    image: Image
+    trajectory: torch.Tensor | None = (
+        None  # (num_timesteps, dict_dim); None for interventions
+    )
+
+
+def _chunked(iterable, n: int):
+    it = iter(iterable)
+    while chunk := list(islice(it, n)):
+        yield chunk
+
 
 class WrappedDiffusion:
     """Wraps StableDiffusion 1.4 to parse the activations with trained Schmidhuber model
@@ -35,122 +54,183 @@ class WrappedDiffusion:
         the decoded activations are passed through the rest of the dffusion model
     """
 
-    def __init__(self, diffusion: StableDiffusionPipeline, schmidhuber: SchmidhuberLinear, layer_name: str = "unet.up_blocks.1.attentions.2"):
+    def __init__(
+        self,
+        diffusion: StableDiffusionPipeline,
+        schmidhuber: SchmidhuberLinear,
+        layer_name: str = "unet.up_blocks.1.attentions.2",
+    ):
         self.diffusion = diffusion
         self.schmidhuber = schmidhuber
         self.layer_name = layer_name
 
-    def generate_and_collect_dictionary(self, generation_params: GenerationParams):
-        dictionary_representations = []
+    def generate_and_collect_dictionary(
+        self,
+        params: GenerationParams,
+        batch_size: int = 1,
+    ) -> list[GenerationResult]:
+        """Run generation for all (prompt, seed) pairs and collect dictionary representations.
+
+        Iterates the Cartesian product of params.prompts × range(params.num_seeds)
+        in batches of batch_size.
+
+        Returns one GenerationResult per (prompt, seed) pair, each carrying the
+        prompt, seed, generated image, and activation trajectory of shape (num_timesteps, dict_dim).
+        """
+        pairs = [
+            (prompt, seed)
+            for prompt in params.prompts
+            for seed in range(params.num_seeds)
+        ]
+
+        results: list[GenerationResult] = []
 
         layer = self._locate_layer(self.layer_name)
 
-        def hook(module, inputs, output):
-            act = output
-            # If output is a tuple (some modules return tuples), take the first tensor
-            if isinstance(act, tuple):
-                act = act[0]
+        for batch in _chunked(pairs, batch_size):
+            batch_prompts = [p for p, _ in batch]
+            batch_seeds = [s for _, s in batch]
+            generators = [
+                torch.Generator(device="cpu").manual_seed(s) for s in batch_seeds
+            ]
 
-            # Expected shapes:
-            # - (B, C, H, W)  -> convert to (B, Npatch, C) where Npatch = H*W
-            # - (B, Npatch, C) -> use as-is
+            per_timestep: list[torch.Tensor] = []
 
-            assert act.ndim == 4
-            B, C, H, W = act.shape
-            patches = act.view(B, C, H * W).permute(0, 2, 1)  # (B, Npatch, C)
+            # Default-arg trick: captures the current list object at definition time,
+            # avoiding stale-closure issues inside the for loop.
+            def hook(_module, _inputs, output, _buf=per_timestep):
+                act = output[0] if isinstance(output, tuple) else output
 
-            # Handle guidance-duplication: if batch is doubled (uncond + cond),
-            # keep only conditioned half (second chunk).
-            if patches.shape[0] % 2 == 0 and generation_params.guidance_scale > 1.0:
-                try:
-                    uncond, cond = patches.chunk(2, dim=0)
-                    patches = cond
-                except Exception:
-                    # if chunk fails, keep patches as-is
-                    pass
+                assert act.ndim == 4
+                B, C, H, W = act.shape
+                patches = act.view(B, C, H * W).permute(0, 2, 1)  # (B, N, C)
 
-            B2, N, C = patches.shape
-            encoder = self.schmidhuber.encoder
-            device = next(encoder.parameters()).device
+                # With CFG the UNet doubles the batch (uncond + cond); keep cond half.
+                if patches.shape[0] % 2 == 0 and params.guidance_scale > 1.0:
+                    _, patches = patches.chunk(2, dim=0)
 
-            # Flatten patches to (B2 * N, C) and encode in one batch
-            patches_flat = patches.reshape(B2 * N, C).to(device)
-            with torch.no_grad():
-                encoded_flat = encoder(patches_flat)  # (B2 * N, dict_dim)
+                B2, N, C2 = patches.shape
+                encoder = self.schmidhuber.encoder
+                device = next(encoder.parameters()).device
 
-            dict_dim = encoded_flat.shape[-1]
-            encoded = encoded_flat.view(B2, N, dict_dim)  # (B2, N, dict_dim)
+                patches_flat = patches.reshape(B2 * N, C2).to(device)
+                with torch.no_grad():
+                    encoded_flat = encoder(patches_flat)  # (B2*N, dict_dim)
 
-            # Average across patches to get a single vector per batch item
-            encoded_mean = encoded.mean(dim=1)  # (B2, dict_dim)
+                dict_dim = encoded_flat.shape[-1]
+                encoded_mean = encoded_flat.view(B2, N, dict_dim).mean(
+                    dim=1
+                )  # (B2, dict_dim)
+                _buf.append(encoded_mean.detach().cpu())
 
-            # Store detached CPU tensor
-            dictionary_representations.append(encoded_mean.detach().cpu())
+            handle = layer.register_forward_hook(hook)
+            try:
+                with torch.no_grad():
+                    output = self.diffusion(
+                        batch_prompts,
+                        num_inference_steps=params.num_inference_steps,
+                        guidance_scale=params.guidance_scale,
+                        generator=generators,
+                    )
+            finally:
+                handle.remove()
 
-        handle = layer.register_forward_hook(hook)
-        try:
-            # Run generation under no_grad to avoid building graphs
+            # per_timestep: T x (B, dict_dim) -> (T, B, dict_dim) -> B x (T, dict_dim)
+            stacked = torch.stack(per_timestep, dim=0)
+            for i, (prompt, seed) in enumerate(batch):
+                results.append(
+                    GenerationResult(
+                        prompt=prompt,
+                        seed=seed,
+                        image=output.images[i],
+                        trajectory=stacked[:, i, :],
+                    )
+                )
+
+        return results
+
+    def generate(
+        self,
+        params: GenerationParams,
+        batch_size: int = 1,
+    ) -> list[GenerationResult]:
+        """Run plain generation for all (prompt, seed) pairs with no hooks.
+
+        Returns one GenerationResult per (prompt, seed) pair (trajectory is None).
+        """
+        pairs = [
+            (prompt, seed)
+            for prompt in params.prompts
+            for seed in range(params.num_seeds)
+        ]
+
+        results: list[GenerationResult] = []
+
+        for batch in _chunked(pairs, batch_size):
+            batch_prompts = [p for p, _ in batch]
+            batch_seeds = [s for _, s in batch]
+            generators = [
+                torch.Generator(device="cpu").manual_seed(s) for s in batch_seeds
+            ]
             with torch.no_grad():
                 output = self.diffusion(
-                    generation_params.prompt,
-                    num_inference_steps=generation_params.num_inference_steps,
-                    guidance_scale=generation_params.guidance_scale,
+                    batch_prompts,
+                    num_inference_steps=params.num_inference_steps,
+                    guidance_scale=params.guidance_scale,
+                    generator=generators,
                 )
-        finally:
-            handle.remove()
+            for i, (prompt, seed) in enumerate(batch):
+                results.append(
+                    GenerationResult(prompt=prompt, seed=seed, image=output.images[i])
+                )
 
-        # dictionary_representations is a list with one entry per hook invocation.
-        # Each entry is a tensor of shape (batch_after_guidance, dict_dim) on CPU.
-        return output, dictionary_representations
+        return results
 
-    def generate(self, generation_param: GenerationParams):
-        rng = torch.Generator(device=self.diffusion.device)
-        rng.manual_seed(generation_param.random_seed)
-        return self.diffusion(
-            prompt=generation_param.prompt,
-            num_inference_steps=generation_param.num_inference_steps,
-            guidance_scale=generation_param.guidance_scale,
-            generator=rng
-        )
+    def generate_with_intervention(
+        self,
+        params: GenerationParams,
+        dictionary_multipliers: dict[int, float],
+        batch_size: int = 1,
+    ) -> list[GenerationResult]:
+        """Run generation with dictionary-space intervention for all (prompt, seed) pairs.
 
-    def generate_with_intervention(self, generation_param: GenerationParams, dictionary_multipliers: dict[int, float]):
+        Returns one GenerationResult per (prompt, seed) pair. trajectory is None
+        since activations are not collected during intervention.
+        """
         multipliers = self._multipliers_dict_to_tensor(dictionary_multipliers)
+
         layer = self._locate_layer(self.layer_name)
 
-        def hook(module, inputs, output):
+        def hook(_module, _inputs, output):
             is_tuple = isinstance(output, tuple)
             act = output[0] if is_tuple else output
 
             B, C, H, W = act.shape
             with torch.no_grad():
-                encoder = self.schmidhuber.encoder
-                decoder = self.schmidhuber.decoder
                 param = next(self.schmidhuber.parameters())
-                model_device = param.device
-                model_dtype = param.dtype
-
                 act_flat = act.permute(0, 2, 3, 1).reshape(B * H * W, C)
-                act_flat = act_flat.to(device=model_device, dtype=model_dtype)
+                act_flat = act_flat.to(device=param.device, dtype=param.dtype)
 
-                encoded = encoder(act_flat)
-
-                multipliers_tensor = multipliers.to(device=encoded.device, dtype=encoded.dtype)
-                encoded = encoded * multipliers_tensor
-
-                decoded = decoder(encoded)
+                encoded = self.schmidhuber.encoder(act_flat)
+                encoded = encoded * multipliers.to(
+                    device=encoded.device, dtype=encoded.dtype
+                )
+                decoded = self.schmidhuber.decoder(encoded)
                 modified = decoded.reshape(B, H, W, C).permute(0, 3, 1, 2)
 
             return (modified,) + output[1:] if is_tuple else modified
 
         handle = layer.register_forward_hook(hook)
         try:
-            result = self.generate(generation_param)
+            results = self.generate(params, batch_size)
         finally:
             handle.remove()
 
-        return result
+        return results
 
-    def _multipliers_dict_to_tensor(self, dictionary_multipliers: dict[int, float]) -> torch.Tensor:
+    def _multipliers_dict_to_tensor(
+        self, dictionary_multipliers: dict[int, float]
+    ) -> torch.Tensor:
         param = next(self.schmidhuber.parameters())
         tensor = torch.ones(
             self.schmidhuber.dictionary_dim,
