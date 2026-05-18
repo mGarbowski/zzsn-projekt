@@ -64,6 +64,30 @@ class WrappedDiffusion:
         self.schmidhuber = schmidhuber
         self.layer_name = layer_name
 
+    @classmethod
+    def from_pretrained(
+        cls,
+        schmidhuber_artifact_id: str,
+        diffusion_model_id: str = "CompVis/stable-diffusion-v1-4",
+        device: str = "cpu",
+        **diffusion_kwargs,
+    ) -> "WrappedDiffusion":
+        """Load a WrappedDiffusion from a pretrained diffusion model and a W&B artifact.
+
+        Args:
+            schmidhuber_artifact_id: W&B artifact identifier for the Schmidhuber checkpoint, e.g. "entity/project/model-{run_id}-epoch_9:latest".
+            diffusion_model_id: HuggingFace model ID passed to StableDiffusionPipeline.from_pretrained
+           
+            **diffusion_kwargs: forwarded to StableDiffusionPipeline.from_pretrained.
+        """
+        diffusion = StableDiffusionPipeline.from_pretrained(
+            diffusion_model_id, **diffusion_kwargs
+        ).to(device)
+        schmidhuber = SchmidhuberLinear.from_wandb_artifact(
+            schmidhuber_artifact_id, device=device
+        )
+        return cls(diffusion, schmidhuber, layer_name=schmidhuber.cfg.layer_name)
+
     def generate_and_collect_dictionary(
         self,
         params: GenerationParams,
