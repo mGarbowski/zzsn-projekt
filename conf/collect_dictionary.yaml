@@ -1,0 +1,4 @@
+defaults:
+  - dictionary_collection_config
+  - infra: athena
+  - _self_

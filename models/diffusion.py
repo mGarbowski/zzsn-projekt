@@ -77,7 +77,7 @@ class WrappedDiffusion:
         Args:
             schmidhuber_artifact_id: W&B artifact identifier for the Schmidhuber checkpoint, e.g. "entity/project/model-{run_id}-epoch_9:latest".
             diffusion_model_id: HuggingFace model ID passed to StableDiffusionPipeline.from_pretrained
-           
+
             **diffusion_kwargs: forwarded to StableDiffusionPipeline.from_pretrained.
         """
         diffusion = StableDiffusionPipeline.from_pretrained(
