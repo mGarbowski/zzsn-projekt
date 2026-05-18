@@ -135,9 +135,9 @@ class WrappedDiffusion:
 
                 B2, N, C2 = patches.shape
                 encoder = self.schmidhuber.encoder
-                device = next(encoder.parameters()).device
+                param = next(encoder.parameters())
 
-                patches_flat = patches.reshape(B2 * N, C2).to(device)
+                patches_flat = patches.reshape(B2 * N, C2).to(device=param.device, dtype=param.dtype)
                 with torch.no_grad():
                     encoded_flat = encoder(patches_flat)  # (B2*N, dict_dim)
 
