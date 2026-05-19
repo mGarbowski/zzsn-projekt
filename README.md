@@ -2,6 +2,23 @@
 
 
 ## TODO
+* Przy interwencji - dodawać rekonstrukcję tylko tych wymiarów w któ©ych wbyłą interwencja
+* Analiza który patch aktywuje dany feature
+  * wizualizacja heatmap
+* Uśrednianie featerów po patchach - zły pomysł
+* Losowanie featureow i timestepow
+* Odwrotna numeracja - duży timestep - najbliżej szumu
+* Pomysł z różnymi grupami promptów - dobry?
+* score oceniający jak ciekawy jest feature - w papierze sauron
+  * coś jak tf-idf
+* Może jakaś metryka oceniająca jak zlokalizowane se patche
+* Może analizować featurey nie uśrednione a dla kilku wylosowanych patchy
+* Tuning hiperparametrów
+  * możemy np wziąc samą stratę rekonstrukcji
+  * może mierzyć sparsity na zbiorze walidacyjnym
+* Spróbować expansion factor 16 jak w saeuronie
+* Wyłączyć filtra NSFW
+
 * Zebrać większy zbiór
   * aktualnie 1000 promptów
   * wiele obrazków per prompt?
@@ -35,3 +52,4 @@ Do dalszych eksperymentów
 ### Papers
 - [Schmidhuber](https://arxiv.org/pdf/2501.18052)
 - [SAeUron](https://arxiv.org/pdf/2501.18052)
+
