@@ -1,7 +1,11 @@
-from dataclasses import dataclass
+from __future__ import annotations
 
-from torch import nn
+from dataclasses import dataclass
+from pathlib import Path
+
 import torch
+import wandb
+from torch import nn
 
 
 @dataclass
@@ -11,6 +15,7 @@ class SchmidhuberLinearConfig:
     predictor_hidden_dims: list[int]
     predictor_dropout: float
     predictor_embedding_dim: int
+    layer_name: str = "unet.up_blocks.1.attentions.2"
 
 
 class SchmidhuberLinear(nn.Module):
@@ -19,6 +24,29 @@ class SchmidhuberLinear(nn.Module):
     Sa imple case where encoder is linear.
     Uses decoder for reconstructing the input from the sparse representation (to allow interventions).
     """
+
+    @classmethod
+    def from_wandb_artifact(cls, artifact_id: str, device: str = "cpu"):
+        """Instantiate a SchmidhuberLinear from a W&B model artifact.
+
+        The artifact's run config must contain a 'model_config' key.
+
+        Args:
+            artifact_id: W&B artifact identifier, e.g.
+                         "entity/project/model-{run_id}-epoch_9:latest"
+            device: device to load the model onto.
+        """
+        api = wandb.Api()
+        artifact = api.artifact(artifact_id, type="model")
+        run = artifact.logged_by()
+        config = SchmidhuberLinearConfig(**run.config["model_config"])
+
+        model = cls(config)
+        artifact_dir = Path(artifact.download())
+        checkpoint_path = next(artifact_dir.glob("*.pt"))
+        model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+        model.to(device)
+        return model
 
     def __init__(self, config: SchmidhuberLinearConfig):
         super().__init__()
