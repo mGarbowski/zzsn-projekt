@@ -1,3 +1,5 @@
+"""Configuration for the train hydra script."""
+
 from dataclasses import dataclass, field
 from typing import Optional
 

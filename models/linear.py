@@ -1,3 +1,10 @@
+"""Implementation of the Schmidhuber model.
+
+Linear encoder and decoder.
+Shared predictor, masking the predicted dimension from the input,
+embedding of the predicted dimension index concatenated to the input.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -21,7 +28,7 @@ class SchmidhuberLinearConfig:
 class SchmidhuberLinear(nn.Module):
     """A simple linear variant of Schmidhuber's architecture for predictability minimization.
 
-    Sa imple case where encoder is linear.
+    Simple case where encoder is linear.
     Uses decoder for reconstructing the input from the sparse representation (to allow interventions).
     """
 
@@ -134,7 +141,6 @@ class SchmidhuberLinear(nn.Module):
         self.shared_predictor.train()
 
 
-# Alternatywa - hypernetwork
 class SchmidhuberSharedPredictor(nn.Module):
     """One network is reused for predicting each of the dictionary dimensions
 
@@ -168,7 +174,9 @@ class SchmidhuberSharedPredictor(nn.Module):
     def forward(
         self, sparse_representation: torch.Tensor, predicted_dim_idx: torch.Tensor
     ):
-        """
+        """Predict one element from the sparse_representation based on the rest.
+        The predicted dimension is zeroed out before prediction.
+
         sparse representation: (batch_dim, dictionary_dim)
         predicted_dim_idx: (batch_dim,) - index of dimension to predict for each batch item
         """
@@ -187,7 +195,6 @@ class SchmidhuberSharedPredictor(nn.Module):
         return self.mlp(mlp_input)
 
 
-# TODO use existing implementation
 class MLP(nn.Module):
     """Multilayer perceptron with ReLU, dropout and batch normalization."""
 

@@ -1,3 +1,5 @@
+"""Loading the dataset with Stable Diffusion activations from HuggingFace"""
+
 from dataclasses import dataclass
 from datasets import load_dataset
 import torch

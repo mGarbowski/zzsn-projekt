@@ -1,3 +1,7 @@
+"""Wrapper for Stable Diffusion to use with the Schmidhuber model.
+To intervene in the generation and/or collect the dictionary representations for analysis
+"""
+
 from dataclasses import dataclass
 from itertools import islice
 
@@ -12,7 +16,9 @@ from models.linear import SchmidhuberLinear
 @dataclass
 class GenerationParams:
     prompts: list[str]
-    num_seeds: int  # seeds 0..num_seeds-1 are tried for every prompt
+    num_seeds: int
+    """seeds 0..num_seeds-1 are tried for every prompt"""
+
     num_inference_steps: int
     guidance_scale: float
 
@@ -22,9 +28,8 @@ class GenerationResult:
     prompt: str
     seed: int
     image: Image
-    trajectory: torch.Tensor | None = (
-        None  # (num_timesteps, dict_dim); None for interventions
-    )
+    trajectory: torch.Tensor | None = None
+    """(num_timesteps, dict_dim); None for interventions"""
 
 
 def _chunked(iterable, n: int):
@@ -36,9 +41,7 @@ def _chunked(iterable, n: int):
 class WrappedDiffusion:
     """Wraps StableDiffusion 1.4 to parse the activations with trained Schmidhuber model
 
-
-
-    Can save the dictionary representation during generation (each timestep?)
+    Can save the dictionary representation during generation (in each timestep)
         The actiovations are passed through the encoder to producte dictionary representation
         and then saved using a hook
         The activations are processed per spatial patch (16x16)
@@ -47,7 +50,7 @@ class WrappedDiffusion:
     Can intervene in the generation
         the user provides a collection of pairs
         (dictionary space index, multiplier)
-        during generation (in each timestep?)
+        during generation (in each timestep)
         the activations are passed through the encoder to produce dictionary representation
         the corresponding dictionary dimensions are multiplied by the multipliers
         the representation after intervention is passed through the decoder
@@ -137,7 +140,9 @@ class WrappedDiffusion:
                 encoder = self.schmidhuber.encoder
                 param = next(encoder.parameters())
 
-                patches_flat = patches.reshape(B2 * N, C2).to(device=param.device, dtype=param.dtype)
+                patches_flat = patches.reshape(B2 * N, C2).to(
+                    device=param.device, dtype=param.dtype
+                )
                 with torch.no_grad():
                     encoded_flat = encoder(patches_flat)  # (B2*N, dict_dim)
 
@@ -256,6 +261,10 @@ class WrappedDiffusion:
     def _multipliers_dict_to_tensor(
         self, dictionary_multipliers: dict[int, float]
     ) -> torch.Tensor:
+        """Convert a dictionary of multipliers to a tensor.
+
+        {1: 11, 3: 33} -> [1, 11, 1, 33, 1, 1, 1...]
+        """
         param = next(self.schmidhuber.parameters())
         tensor = torch.ones(
             self.schmidhuber.dictionary_dim,
@@ -267,6 +276,9 @@ class WrappedDiffusion:
         return tensor
 
     def _locate_layer(self, layer_name: str) -> nn.Module:
+        """Select a layer from the diffusion model based on a dotted path.
+        Like "unet.up_blocks.1.attentions.2"
+        """
         block = self.diffusion
         for step in layer_name.split("."):
             block = block[int(step)] if step.isdigit() else getattr(block, step)

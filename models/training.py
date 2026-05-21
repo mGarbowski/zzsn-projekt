@@ -1,3 +1,5 @@
+"""Trainer for SchmidhuberLinear model via predictability minimization."""
+
 from dataclasses import asdict, dataclass
 
 from enum import Enum
