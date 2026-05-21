@@ -241,6 +241,7 @@ class WrappedDiffusion:
                 )
                 decoded = self.schmidhuber.decoder(encoded)
                 modified = decoded.reshape(B, H, W, C).permute(0, 3, 1, 2)
+                modified = modified.to(device=act.device, dtype=act.dtype)
 
             return (modified,) + output[1:] if is_tuple else modified
 
