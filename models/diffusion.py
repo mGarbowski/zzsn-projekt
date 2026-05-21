@@ -245,18 +245,8 @@ class WrappedDiffusion:
                     device=encoded.device, dtype=encoded.dtype
                 )
                 decoded = self.schmidhuber.decoder(encoded)
-                # DEBUG
-                print(
-                    f"decoded: min={decoded.min():.4f}, max={decoded.max():.4f}, has_nan={torch.isnan(decoded).any()}, has_inf={torch.isinf(decoded).any()}"
-                )
-
                 modified = decoded.reshape(B, H, W, C).permute(0, 3, 1, 2)
                 modified = modified.to(device=act.device, dtype=act.dtype)
-
-                # DEBUG
-                print(
-                    f"modified: min={modified.min():.4f}, max={modified.max():.4f}, has_nan={torch.isnan(modified).any()}, has_inf={torch.isinf(modified).any()}"
-                )
 
             return (modified,) + output[1:] if is_tuple else modified
 
