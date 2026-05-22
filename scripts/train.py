@@ -1,4 +1,3 @@
-# scripts/train.py
 import sys
 import traceback
 from pathlib import Path
@@ -9,7 +8,7 @@ import torch
 from omegaconf import OmegaConf, SCMode
 
 from conf.paths import HYDRA_CONFIG_ROOT_STR
-from models.dataset import DataSourceConfig, get_data_loader
+from models.dataset import DataSourceConfig, get_data_loaders
 from models.linear import SchmidhuberLinear, SchmidhuberLinearConfig
 from models.train_config import TrainScriptConfig, register_configs
 from models.training import Trainer, TrainerConfig
@@ -64,10 +63,10 @@ def main(cfg: TrainScriptConfig) -> None:
         print(f"Created model with {model.num_parameters()} parameters")
 
         print("Loading data...")
-        loader = get_data_loader(data_source_cfg)
+        loaders = get_data_loaders(data_source_cfg)
 
         print("Starting training...")
-        Trainer(trainer_cfg, model).train(loader)
+        Trainer(trainer_cfg, model).train(loaders["train"], loaders["val"])
 
     except Exception:
         traceback.print_exc(file=sys.stderr)

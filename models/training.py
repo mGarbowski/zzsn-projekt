@@ -4,6 +4,8 @@ from dataclasses import asdict, dataclass
 
 from enum import Enum
 from pathlib import Path
+
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from models.linear import SchmidhuberLinear, SchmidhuberLinearConfig
@@ -54,10 +56,14 @@ class Trainer:
         self.reconstruction_losses = []
         self.predictability_losses = []
         self.autoencoder_losses = []
+
+        self.val_reconstruction_losses = []
+        self.val_predictability_losses = []
+
         self.global_step = 0
         self.phase = TrainingPhase.AUTOENCODER
 
-    def train(self, data_loader: torch.utils.data.DataLoader):
+    def train(self, train_loader: DataLoader, val_loader: DataLoader):
         self.reset()
 
         wandb.init(
@@ -69,7 +75,7 @@ class Trainer:
 
         try:
             for epoch_idx in tqdm(range(self.cfg.num_epochs), desc="Epochs"):
-                for batch_idx, batch in enumerate(tqdm(data_loader, desc="Batches")):
+                for batch_idx, batch in enumerate(tqdm(train_loader, desc="Batches")):
                     if batch_idx % self.cfg.batches_per_phase == 0:
                         self.switch_phase()
 
