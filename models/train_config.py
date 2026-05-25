@@ -12,16 +12,16 @@ from conf.paths import SCRATCH_ROOT
 class TrainScriptConfig:
     # model config
     input_dim: int = 1280
-    expansion_factor: int = 16
+    expansion_factor: int = 8
     predictor_hidden_dims: list[int] = field(default_factory=lambda: [256])
     predictor_dropout: float = 0.3
     predictor_embedding_dim: int = 128
 
     # trainer config
-    batch_size: int = 32
+    batch_size: int = 16
     batches_per_phase: int = 16
     num_epochs: int = 2
-    num_steps_per_checkpoint: int = 4096
+    num_steps_per_checkpoint: int = 20_000
     num_validation_batches_per_checkpoint: int = 128
     learning_rate_predictors: float = 4e-4
     learning_rate_autoencoder: float = 1e-4
