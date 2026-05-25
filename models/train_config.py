@@ -18,7 +18,7 @@ class TrainScriptConfig:
     predictor_embedding_dim: int = 128
 
     # trainer config
-    batch_size: int = 512
+    batch_size: int = 32
     batches_per_phase: int = 16
     num_epochs: int = 2
     num_steps_per_checkpoint: int = 4096
