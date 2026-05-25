@@ -28,7 +28,7 @@ class TrainScriptConfig:
     reconstruction_loss_weight: float = 1.0
 
     # data config
-    dataset_repo_id: str = "mgarbowski/zzsn-activations-1_unet.up_blocks.1.attentions.2"
+    dataset_repo_id: str = "mgarbowski/zzsn-activations-2_unet.up_blocks.1.attentions.2"
     dataset_split: str = "train"
     num_workers: int = 0
     shuffle: bool = True
