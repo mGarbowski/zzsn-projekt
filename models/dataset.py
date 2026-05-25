@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import TypedDict
 
 from datasets import load_dataset, DatasetDict
-import torch
 from torch.utils.data import DataLoader
 
 
@@ -20,6 +19,7 @@ class DataSourceConfig:
 class DataLoadersDict(TypedDict):
     train: DataLoader
     val: DataLoader
+
 
 def get_data_loaders(cfg: DataSourceConfig) -> DataLoadersDict:
     """Split the dataset and create data loaders
