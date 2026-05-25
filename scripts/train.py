@@ -48,6 +48,8 @@ def main(cfg: TrainScriptConfig) -> None:
             model_config=model_cfg,
             batches_per_phase=run_cfg.batches_per_phase,
             num_epochs=run_cfg.num_epochs,
+            num_steps_per_checkpoint=run_cfg.num_steps_per_checkpoint,
+            num_validation_batches_per_checkpoint=run_cfg.num_validation_batches_per_checkpoint,
             learning_rate_predictors=run_cfg.learning_rate_predictors,
             learning_rate_autoencoder=run_cfg.learning_rate_autoencoder,
             reconstruction_loss_weight=run_cfg.reconstruction_loss_weight,

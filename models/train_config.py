@@ -21,6 +21,8 @@ class TrainScriptConfig:
     batch_size: int = 32
     batches_per_phase: int = 16
     num_epochs: int = 3
+    num_steps_per_checkpoint: int = 10_000
+    num_validation_batches_per_checkpoint: int = 100
     learning_rate_predictors: float = 4e-4
     learning_rate_autoencoder: float = 1e-4
     reconstruction_loss_weight: float = 1.0
@@ -51,6 +53,10 @@ class TrainScriptConfig:
             raise ValueError("batches_per_phase must be > 0")
         if self.num_epochs <= 0:
             raise ValueError("num_epochs must be > 0")
+        if self.num_steps_per_checkpoint <= 0:
+            raise ValueError("num_steps_per_checkpoint must be > 0")
+        if self.num_validation_batches_per_checkpoint <= 0:
+            raise ValueError("num_validation_batches_per_checkpoint must be > 0")
         if self.learning_rate_predictors <= 0:
             raise ValueError("learning_rate_predictors must be > 0")
         if self.learning_rate_autoencoder <= 0:

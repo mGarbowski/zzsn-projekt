@@ -19,6 +19,11 @@ class TrainerConfig:
     batches_per_phase: int
     """Number of batches for each training phase (autoencoder or predictor) before switching to the other phase."""
     num_epochs: int
+    num_steps_per_checkpoint: int
+    """Number of training steps (mini-batches) between each checkpoint and validation.
+    Epochs are not granular enough for this purpose."""
+    num_validation_batches_per_checkpoint: int
+    """A subset of the validation partition to evaluate the model on after each checkpoint."""
     learning_rate_predictors: float
     learning_rate_autoencoder: float
     reconstruction_loss_weight: float
@@ -57,10 +62,7 @@ class Trainer:
         self.predictability_losses = []
         self.autoencoder_losses = []
 
-        self.val_reconstruction_losses = []
-        self.val_predictability_losses = []
-
-        self.global_step = 0
+        self.global_step = 1
         self.phase = TrainingPhase.AUTOENCODER
 
     def train(self, train_loader: DataLoader, val_loader: DataLoader):
@@ -86,9 +88,12 @@ class Trainer:
                     else:
                         self.autoencoder_step(xs, epoch_idx)
 
-                    self.global_step += 1
+                    if self.global_step % self.cfg.num_steps_per_checkpoint == 0:
+                        self.save_checkpoint(self.global_step)
+                        self.validate(val_loader, epoch_idx)
+                        self.model.train()
 
-                self.save_checkpoint(epoch_idx)
+                    self.global_step += 1
 
         finally:
             wandb.finish()
@@ -150,11 +155,59 @@ class Trainer:
             autoencoder_loss=autoencoder_loss.item(),
         )
 
+    def validate(self, val_loader: DataLoader, epoch_idx: int):
+        val_reconstruction_losses = []
+        val_predictability_losses = []
+        val_autoencoder_losses = []
+
+        self.model.eval()
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(
+                tqdm(val_loader, desc="Validation Batches")
+            ):
+                if batch_idx >= self.cfg.num_validation_batches_per_checkpoint:
+                    break
+
+                xs = batch["activations"].to(self.device)
+
+                sparse_representations = self.model.encoder(xs)
+                reconstructions = self.model.decoder(sparse_representations)
+                predictions = self.model.predict_all(sparse_representations)
+
+                reconstruction_loss = self.loss_fn(reconstructions, xs)
+                predictability_loss = self.loss_fn(predictions, sparse_representations)
+                autoencoder_loss = (
+                    self.cfg.reconstruction_loss_weight * reconstruction_loss
+                    - predictability_loss
+                )
+
+                val_reconstruction_losses.append(reconstruction_loss.item())
+                val_predictability_losses.append(predictability_loss.item())
+                val_autoencoder_losses.append(autoencoder_loss.item())
+
+        mean_reconstruction_loss = sum(val_reconstruction_losses) / len(
+            val_reconstruction_losses
+        )
+        mean_predictability_loss = sum(val_predictability_losses) / len(
+            val_predictability_losses
+        )
+        mean_autoencoder_loss = sum(val_autoencoder_losses) / len(
+            val_autoencoder_losses
+        )
+
+        self.log_losses(
+            epoch_idx,
+            reconstruction_loss=mean_reconstruction_loss,
+            predictability_loss=mean_predictability_loss,
+            autoencoder_loss=mean_autoencoder_loss,
+            mode="val",
+        )
+
     def reset(self):
         self.reconstruction_losses.clear()
         self.predictability_losses.clear()
         self.autoencoder_losses.clear()
-        self.global_step = 0
+        self.global_step = 1
         self.phase = TrainingPhase.AUTOENCODER
 
     def log_losses(
@@ -163,28 +216,28 @@ class Trainer:
         reconstruction_loss: float | None = None,
         predictability_loss: float | None = None,
         autoencoder_loss: float | None = None,
+        mode: str = "train",
     ):
         wandb.log(
             {
-                "train/reconstruction_loss": reconstruction_loss,
-                "train/predictability_loss": predictability_loss,
-                "train/autoencoder_loss": autoencoder_loss,
+                f"{mode}/reconstruction_loss": reconstruction_loss,
+                f"{mode}/predictability_loss": predictability_loss,
+                f"{mode}/autoencoder_loss": autoencoder_loss,
                 "epoch": epoch_idx,
             },
             step=self.global_step,
         )
 
-    # TODO save model configuration as well
-    def save_checkpoint(self, epoch_idx: int):
+    def save_checkpoint(self, step_idx: int):
         checkpoint_dir = Path(f"{self.cfg.checkpoint_dir}/{wandb.run.id}")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-        checkpoint_path = checkpoint_dir / f"model_epoch_{epoch_idx}.pt"
+        checkpoint_path = checkpoint_dir / f"model_step_{step_idx}.pt"
         torch.save(self.model.state_dict(), checkpoint_path)
 
         if self.cfg.wandb_mode != "disabled":
             artifact = wandb.Artifact(
-                name=f"model-{wandb.run.id}-epoch_{epoch_idx}", type="model"
+                name=f"model-{wandb.run.id}-step_{step_idx}", type="model"
             )
             artifact.add_file(str(checkpoint_path))
             wandb.log_artifact(artifact)
