@@ -30,6 +30,8 @@ class TrainerConfig:
     learning_rate_autoencoder: float
     reconstruction_loss_weight: float
     checkpoint_dir: str
+    checkpoint_every_n_batches: int | None = None
+    """Save a checkpoint every N batches. None saves once at the end of each epoch."""
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     wandb_project: str = "zzsn-projekt"
     wandb_run_name: str | None = None
@@ -103,7 +105,14 @@ class Trainer:
 
                     self.global_step += 1
 
-                self.save_checkpoint(epoch_idx)
+                    if (
+                        self.cfg.checkpoint_every_n_batches is not None
+                        and self.global_step % self.cfg.checkpoint_every_n_batches == 0
+                    ):
+                        self.save_checkpoint(epoch_idx)
+
+                if self.cfg.checkpoint_every_n_batches is None:
+                    self.save_checkpoint(epoch_idx)
 
         finally:
             wandb.finish()
@@ -194,12 +203,13 @@ class Trainer:
         checkpoint_dir = Path(f"{self.cfg.checkpoint_dir}/{wandb.run.id}")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-        checkpoint_path = checkpoint_dir / f"model_epoch_{epoch_idx}.pt"
+        stem = f"epoch_{epoch_idx}_step_{self.global_step}"
+        checkpoint_path = checkpoint_dir / f"model_{stem}.pt"
         torch.save(self.model.state_dict(), checkpoint_path)
 
         if self.cfg.wandb_mode != "disabled":
             artifact = wandb.Artifact(
-                name=f"model-{wandb.run.id}-epoch_{epoch_idx}", type="model"
+                name=f"model-{wandb.run.id}-{stem}", type="model"
             )
             artifact.add_file(str(checkpoint_path))
 
@@ -220,8 +230,8 @@ class Trainer:
                     preview_params, {}
                 )[0].image
 
-                normal_path = checkpoint_dir / f"preview_normal_epoch_{epoch_idx}.png"
-                intervened_path = checkpoint_dir / f"preview_intervention_epoch_{epoch_idx}.png"
+                normal_path = checkpoint_dir / f"preview_normal_{stem}.png"
+                intervened_path = checkpoint_dir / f"preview_intervention_{stem}.png"
                 normal_img.save(str(normal_path))
                 intervened_img.save(str(intervened_path))
 
