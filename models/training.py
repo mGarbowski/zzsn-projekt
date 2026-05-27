@@ -6,9 +6,18 @@ from enum import Enum
 from pathlib import Path
 from tqdm import tqdm
 
+from diffusers import StableDiffusionPipeline
+from loguru import logger
+
+from models.diffusion import GenerationParams, WrappedDiffusion
 from models.linear import SchmidhuberLinear, SchmidhuberLinearConfig
 import torch
 import wandb
+
+_PREVIEW_PROMPT = "monkeys playing poker in photorealistic style"
+_PREVIEW_SEED = 0  # num_seeds=1 → seed 0
+_PREVIEW_STEPS = 20
+_PREVIEW_GUIDANCE = 7.5
 
 
 @dataclass
@@ -56,6 +65,18 @@ class Trainer:
         self.autoencoder_losses = []
         self.global_step = 0
         self.phase = TrainingPhase.AUTOENCODER
+        self.wrapped_diffusion: WrappedDiffusion | None = None
+
+    def load_diffusion_model(self, pipeline: StableDiffusionPipeline) -> None:
+        """Attach a Stable Diffusion pipeline for checkpoint preview image generation.
+
+        Constructs a WrappedDiffusion around the pipeline and the trainer's own model,
+        so there is a single source of truth for the Schmidhuber weights.
+        Call this before training if you want preview images logged at each checkpoint.
+        """
+        self.wrapped_diffusion = WrappedDiffusion(
+            pipeline, self.model, layer_name=self.model.cfg.layer_name
+        )
 
     def train(self, data_loader: torch.utils.data.DataLoader):
         self.reset()
@@ -181,4 +202,30 @@ class Trainer:
                 name=f"model-{wandb.run.id}-epoch_{epoch_idx}", type="model"
             )
             artifact.add_file(str(checkpoint_path))
+
+            if self.wrapped_diffusion is None:
+                logger.warning(
+                    "No diffusion model loaded — skipping preview image generation. "
+                    "Call load_diffusion_model() before training to enable this."
+                )
+            else:
+                preview_params = GenerationParams(
+                    prompts=[_PREVIEW_PROMPT],
+                    num_seeds=1,
+                    num_inference_steps=_PREVIEW_STEPS,
+                    guidance_scale=_PREVIEW_GUIDANCE,
+                )
+                normal_img = self.wrapped_diffusion.generate(preview_params)[0].image
+                intervened_img = self.wrapped_diffusion.generate_with_intervention(
+                    preview_params, {}
+                )[0].image
+
+                normal_path = checkpoint_dir / f"preview_normal_epoch_{epoch_idx}.png"
+                intervened_path = checkpoint_dir / f"preview_intervention_epoch_{epoch_idx}.png"
+                normal_img.save(str(normal_path))
+                intervened_img.save(str(intervened_path))
+
+                artifact.add_file(str(normal_path))
+                artifact.add_file(str(intervened_path))
+
             wandb.log_artifact(artifact)
