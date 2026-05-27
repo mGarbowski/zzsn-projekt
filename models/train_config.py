@@ -24,6 +24,7 @@ class TrainScriptConfig:
     learning_rate_predictors: float = 4e-4
     learning_rate_autoencoder: float = 1e-4
     reconstruction_loss_weight: float = 1.0
+    predictability_loss_weight: float = 1.0
 
     # data config
     dataset_repo_id: str = "mgarbowski/zzsn-activations-1_unet.up_blocks.1.attentions.2"
@@ -57,6 +58,8 @@ class TrainScriptConfig:
             raise ValueError("learning_rate_autoencoder must be > 0")
         if self.reconstruction_loss_weight < 0:
             raise ValueError("relative reconstruction_loss_weight must be >= 0")
+        if self.predictability_loss_weight < 0:
+            raise ValueError("predictability_loss_weight must be >= 0")
         if self.wandb_mode not in {"online", "offline", "disabled"}:
             raise ValueError("wandb_mode must be one of: online, offline, disabled")
 

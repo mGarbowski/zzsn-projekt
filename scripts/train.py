@@ -52,6 +52,7 @@ def main(cfg: TrainScriptConfig) -> None:
             learning_rate_predictors=run_cfg.learning_rate_predictors,
             learning_rate_autoencoder=run_cfg.learning_rate_autoencoder,
             reconstruction_loss_weight=run_cfg.reconstruction_loss_weight,
+            predictability_loss_weight=run_cfg.predictability_loss_weight,
             wandb_project=run_cfg.wandb_project,
             wandb_run_name=run_cfg.wandb_run_name,
             wandb_mode=run_cfg.wandb_mode,
