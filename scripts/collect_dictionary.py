@@ -38,7 +38,7 @@ def main(cfg: DictionaryCollectionScriptConfig) -> None:
     )
     try:
         prompts_dataset = load_dataset(run_cfg.prompts_hf_repo_id)
-        prompts = list(prompts_dataset["prompt"])
+        prompts = list(prompts_dataset["train"]["prompt"])
 
         wrapped = WrappedDiffusion.from_pretrained(
             schmidhuber_artifact_id=run_cfg.schmidhuber_artifact_id,
