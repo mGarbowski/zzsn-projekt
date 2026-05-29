@@ -2,7 +2,6 @@
 # example usage:
 #   python scripts/collect_dictionary.py \
 #     schmidhuber_artifact_id=entity/project/model-abc123-epoch_9:latest \
-#     "prompts=[a cat, a dog]" \
 #     num_seeds=3 \
 #     batch_size=4
 
@@ -11,6 +10,7 @@ import traceback
 
 import hydra
 import torch
+from datasets import load_dataset
 from omegaconf import OmegaConf, SCMode
 
 from activation_collection.dictionary_config import (
@@ -37,6 +37,9 @@ def main(cfg: DictionaryCollectionScriptConfig) -> None:
         cfg, resolve=True, structured_config_mode=SCMode.INSTANTIATE
     )
     try:
+        prompts_dataset = load_dataset(run_cfg.prompts_hf_repo_id)
+        prompts = list(prompts_dataset["prompt"])
+
         wrapped = WrappedDiffusion.from_pretrained(
             schmidhuber_artifact_id=run_cfg.schmidhuber_artifact_id,
             diffusion_model_id=run_cfg.diffusion_model_id,
@@ -45,7 +48,7 @@ def main(cfg: DictionaryCollectionScriptConfig) -> None:
         )
 
         generation_params = GenerationParams(
-            prompts=run_cfg.prompts,
+            prompts=prompts,
             num_seeds=run_cfg.num_seeds,
             num_inference_steps=run_cfg.num_inference_steps,
             guidance_scale=run_cfg.guidance_scale,

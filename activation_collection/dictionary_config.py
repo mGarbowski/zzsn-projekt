@@ -10,7 +10,7 @@ class DictionaryCollectionScriptConfig:
     schmidhuber_artifact_id: str
     output_dir: str
 
-    prompts: list[str]
+    prompts_hf_repo_id: str = "mgarbowski/zzsn-style-prompts"
 
     num_seeds: int = 1
     num_inference_steps: int = 50
