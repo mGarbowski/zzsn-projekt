@@ -29,6 +29,7 @@ class TrainerConfig:
     learning_rate_predictors: float
     learning_rate_autoencoder: float
     reconstruction_loss_weight: float
+    predictability_loss_weight: float = 1.0
     checkpoint_dir: str
     checkpoint_every_n_batches: int | None = None
     """Save a checkpoint every N batches. None saves once at the end of each epoch."""
@@ -156,7 +157,7 @@ class Trainer:
         predictability_loss = self.loss_fn(predictions, sparse_representations)
         autoencoder_loss = (
             self.cfg.reconstruction_loss_weight * reconstruction_loss
-            - predictability_loss
+            - self.cfg.predictability_loss_weight * predictability_loss
         )
 
         self.reconstruction_losses.append(reconstruction_loss.item())
