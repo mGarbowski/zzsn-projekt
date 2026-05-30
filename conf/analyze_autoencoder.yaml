@@ -1,0 +1,4 @@
+defaults:
+  - analyze_autoencoder_config
+  - infra: athena
+  - _self_
