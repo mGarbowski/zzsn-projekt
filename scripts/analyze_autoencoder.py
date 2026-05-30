@@ -16,7 +16,7 @@ from pathlib import Path
 import hydra
 from omegaconf import OmegaConf, SCMode
 
-from activation_collection.config import register_configs
+from models.analysis.analysis_script_config import register_configs
 from conf.paths import HYDRA_CONFIG_ROOT_STR
 from models.analysis.analysis_runner import AnalysisRunnerConfig, AnalysisRunner
 from models.analysis.analysis_script_config import AnalyzeAutoencoderScriptConfig
