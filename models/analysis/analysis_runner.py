@@ -31,7 +31,9 @@ class AnalysisRunnerConfig:
     wandb_project: str = "zzsn-projekt"
 
     top_k_dimensions: int = 10
-    intervention_strengths: list[int] = field(default_factory=lambda: [1, 0, -1, -10])
+    intervention_strengths: list[float] = field(
+        default_factory=lambda: [1.0, 0.0, -1.0, -10.0]
+    )
 
     sample_prompt_base: str = "A picture of a british shorthair cat"
 
@@ -117,8 +119,10 @@ class AnalysisRunner:
 
         # Stack activations:
         # (example, timestep, dictionary_dim)
-        activations_c = torch.stack([ex["activations"] for ex in D_c], dim=0)
-        activations_not_c = torch.stack([ex["activations"] for ex in D_not_c], dim=0)
+        _to_tensor_act = lambda ex: torch.tensor(ex["activations"], dtype=torch.float32)
+
+        activations_c = torch.stack([_to_tensor_act(ex) for ex in D_c], dim=0)
+        activations_not_c = torch.stack([_to_tensor_act(ex) for ex in D_not_c], dim=0)
 
         # Mean over dataset examples:
         # (num_timesteps, dictionary_dim)

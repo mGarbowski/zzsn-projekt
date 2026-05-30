@@ -21,7 +21,9 @@ class AnalyzeAutoencoderScriptConfig:
     wandb_project: str = "zzsn-projekt"
 
     top_k_dimensions: int = 10
-    intervention_strengths: list[int] = field(default_factory=lambda: [1, 0, -1, -10])
+    intervention_strengths: list[float] = field(
+        default_factory=lambda: [1.0, 0.0, -1.0, -10.0]
+    )
 
     sample_prompt_base: str = "A picture of a british shorthair cat"
 
