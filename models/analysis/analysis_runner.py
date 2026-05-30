@@ -1,6 +1,10 @@
-from dataclasses import dataclass, field
+import json
+from dataclasses import dataclass, field, asdict
+from pathlib import Path
 
+import numpy as np
 import torch
+import wandb
 from datasets import load_dataset, Dataset, Features, Value, Sequence
 from matplotlib import pyplot as plt
 from torch import Tensor
@@ -11,6 +15,8 @@ from models.diffusion import WrappedDiffusion, GenerationParams, GenerationResul
 
 @dataclass
 class AnalysisRunnerConfig:
+    out_dir: Path
+
     schmidhuber_artifact_id: str
     prompts_hf_repo_id: str = "mgarbowski/zzsn-style-prompts"
 
@@ -129,7 +135,6 @@ class AnalysisRunner:
         """Make a histogram of dimension scores.
         For some selected timesteps, see how many dimensions are relevant to the style (high score)
         """
-        # TODO return type?
         fig, ax = plt.subplots(len(timesteps))
         fig.suptitle(f"Rozkład oceny wymiarów słownika dla stylu {style}")
         for i, t in enumerate(timesteps):
@@ -226,22 +231,72 @@ class AnalysisRunner:
         plt.tight_layout()
         return fig
 
+    def process_and_save_results(self, wb_run, per_style_analysis_results, sample_images_fig):
+        out_dir = self.cfg.out_dir / wb_run.id
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        table = wandb.Table(columns=["style", "top_features", "score_distribution"])
+        for style, result in per_style_analysis_results.items():
+            style_dir = out_dir / style.replace(" ", "_")
+            style_dir.mkdir(parents=True, exist_ok=True)
+
+            scores_np = result["scores"].cpu().numpy()
+            mu_c_np = result["mu_c"].cpu().numpy()
+            np.save(style_dir / "scores.npy", scores_np)
+            np.save(style_dir / "mu_c.npy", mu_c_np)
+
+            top_features = result["top_features"]
+            with open(style_dir / "top_features.json", "w", encoding="utf8") as f:
+                json.dump(top_features, f, indent=2)
+
+            hist_fig = result["histograms_plot"]
+            hist_path = style_dir / "histogram.png"
+            hist_fig.savefig(hist_path, bbox_inches="tight")
+            plt.close(hist_fig)
+
+            table.add_data(style, json.dumps(top_features), wandb.Image(str(hist_path)))
+
+        sample_path = out_dir / "sample_images.png"
+        sample_images_fig.savefig(sample_path, bbox_inches="tight")
+        plt.close(sample_images_fig)
+
+        art = wandb.Artifact(name=f"analysis-{wb_run.id}", type="analysis",
+                             metadata={"model_artifact": self.cfg.schmidhuber_artifact_id})
+        art.add_dir(str(out_dir))
+
+        wb_run.log_artifact(art)
+        wb_run.log({"analysis/summary_table": table})
+        wb_run.log({"analysis/sample_images": wandb.Image(str(sample_path))})
+
     def run(self) -> None:
-        diffusion = self._load_wrapped_diffusion()
-        prompt_ds = self._load_prompts_dataset()
+        wb_run = wandb.init(
+            project=self.cfg.wandb_project,
+            job_type="analysis",
+            config=asdict(self.cfg),
+            reinit=True,
+        )
+        try:
+            wb_run.use_artifact(self.cfg.schmidhuber_artifact_id)
 
-        generation_params = self._make_generation_params(prompt_ds)
-        generation_results = diffusion.generate_and_collect_dictionary(generation_params, self.cfg.batch_size)
-        dictionary_ds = self._make_dictionary_representations_dataset(generation_results, prompt_ds)
+            diffusion = self._load_wrapped_diffusion()
+            prompt_ds = self._load_prompts_dataset()
 
-        styles = list(set(prompt_ds["style"]))
-        per_style_analysis_results = {
-            style: self.analyze_style(style, dictionary_ds, self.cfg.top_k_dimensions)
-            for style in styles
-        }
+            generation_params = self._make_generation_params(prompt_ds)
+            generation_results = diffusion.generate_and_collect_dictionary(generation_params, self.cfg.batch_size)
+            dictionary_ds = self._make_dictionary_representations_dataset(generation_results, prompt_ds)
 
-        top_dimensions = {
-            style: per_style_analysis_results[style]["top_features"]
-            for style in styles
-        }
-        sample_images = self.make_sample_images(diffusion, styles, top_dimensions)
+            styles = sorted(set(prompt_ds["style"]))
+            per_style_analysis_results = {
+                style: self.analyze_style(style, dictionary_ds, self.cfg.top_k_dimensions)
+                for style in styles
+            }
+
+            top_dimensions = {
+                style: per_style_analysis_results[style]["top_features"]
+                for style in styles
+            }
+            sample_images_fig = self.make_sample_images(diffusion, styles, top_dimensions)
+            self.process_and_save_results(wb_run, per_style_analysis_results, sample_images_fig)
+
+        finally:
+            wb_run.finish()
