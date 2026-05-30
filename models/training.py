@@ -221,7 +221,9 @@ class Trainer:
                 )[0].image
 
                 normal_path = checkpoint_dir / f"preview_normal_epoch_{epoch_idx}.png"
-                intervened_path = checkpoint_dir / f"preview_intervention_epoch_{epoch_idx}.png"
+                intervened_path = (
+                    checkpoint_dir / f"preview_intervention_epoch_{epoch_idx}.png"
+                )
                 normal_img.save(str(normal_path))
                 intervened_img.save(str(intervened_path))
 

@@ -8,6 +8,7 @@ Generate few example images with and without intervention
 
 Saves the results as wandb artifacts
 """
+
 import sys
 import traceback
 from pathlib import Path
@@ -54,5 +55,5 @@ def main(cfg: AnalyzeAutoencoderScriptConfig) -> None:
         raise
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

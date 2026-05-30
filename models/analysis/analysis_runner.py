@@ -37,7 +37,6 @@ class AnalysisRunnerConfig:
 
 
 class AnalysisRunner:
-
     def __init__(self, cfg: AnalysisRunnerConfig) -> None:
         self.cfg = cfg
 
@@ -60,8 +59,9 @@ class AnalysisRunner:
             guidance_scale=self.cfg.guidance_scale,
         )
 
-    def _make_dictionary_representations_dataset(self, generation_results: list[GenerationResult],
-                                                 prompts_ds: Dataset) -> Dataset:
+    def _make_dictionary_representations_dataset(
+        self, generation_results: list[GenerationResult], prompts_ds: Dataset
+    ) -> Dataset:
         """Gather collected dictionary representations into hf Dataset for convenient processing."""
         prompt_to_style_mapping = dict(zip(prompts_ds["prompt"], prompts_ds["style"]))
 
@@ -99,7 +99,9 @@ class AnalysisRunner:
         return with_style, without_style
 
     @staticmethod
-    def compute_scores_for_style(style: str, dictionary_ds: Dataset, delta: float = 1e-8) -> tuple[Tensor, Tensor]:
+    def compute_scores_for_style(
+        style: str, dictionary_ds: Dataset, delta: float = 1e-8
+    ) -> tuple[Tensor, Tensor]:
         """Compute a tensor of scores for each dimension in each timestep.
 
         Scores with respect to the given style and the dictionary dataset.
@@ -131,7 +133,9 @@ class AnalysisRunner:
         return scores, mu_c
 
     @staticmethod
-    def _make_histogram_of_dimension_scores(scores: Tensor, timesteps: list[int], style: str):
+    def _make_histogram_of_dimension_scores(
+        scores: Tensor, timesteps: list[int], style: str
+    ):
         """Make a histogram of dimension scores.
         For some selected timesteps, see how many dimensions are relevant to the style (high score)
         """
@@ -145,7 +149,9 @@ class AnalysisRunner:
         return fig
 
     @staticmethod
-    def _select_top_k_features_for_style(scores: Tensor, mu_c: Tensor, k: int) -> dict[int, float]:
+    def _select_top_k_features_for_style(
+        scores: Tensor, mu_c: Tensor, k: int
+    ) -> dict[int, float]:
         """Select top k dictionary dimensions with the highest score on average over timesteps.
 
         Map the dimensions indices to their average activation on the D_c partition.
@@ -161,7 +167,9 @@ class AnalysisRunner:
     @staticmethod
     def analyze_style(style: str, dictionary_ds: Dataset, k: int):
         scores, mu_c = AnalysisRunner.compute_scores_for_style(style, dictionary_ds)
-        histograms_plot = AnalysisRunner._make_histogram_of_dimension_scores(scores, [0, 10, 20, 30, 40, 50], style)
+        histograms_plot = AnalysisRunner._make_histogram_of_dimension_scores(
+            scores, [0, 10, 20, 30, 40, 50], style
+        )
         top_features = AnalysisRunner._select_top_k_features_for_style(scores, mu_c, k)
         return {
             "scores": scores,
@@ -170,9 +178,13 @@ class AnalysisRunner:
             "top_features": top_features,
         }
 
-    def _make_image_row_no_intervention(self, diffusion: WrappedDiffusion, styles: list[str]) -> list[Image]:
+    def _make_image_row_no_intervention(
+        self, diffusion: WrappedDiffusion, styles: list[str]
+    ) -> list[Image]:
         params = GenerationParams(
-            prompts=[f"{self.cfg.sample_prompt_base} in {style} style" for style in styles],
+            prompts=[
+                f"{self.cfg.sample_prompt_base} in {style} style" for style in styles
+            ],
             num_seeds=self.cfg.num_seeds,
             num_inference_steps=self.cfg.num_inference_steps,
             guidance_scale=self.cfg.guidance_scale,
@@ -181,8 +193,11 @@ class AnalysisRunner:
         return [r.image for r in results]
 
     def _make_image_row_with_intervention(
-            self, diffusion: WrappedDiffusion, styles: list[str], strength: float,
-            top_dimensions: dict[str, dict[int, float]]
+        self,
+        diffusion: WrappedDiffusion,
+        styles: list[str],
+        strength: float,
+        top_dimensions: dict[str, dict[int, float]],
     ) -> list[Image]:
         results = []
 
@@ -193,17 +208,27 @@ class AnalysisRunner:
                 num_inference_steps=self.cfg.num_inference_steps,
                 guidance_scale=self.cfg.guidance_scale,
             )
-            dictionary_multipliers = {k: strength * v for k, v in top_dimensions[style].items()}
-            result = diffusion.generate_with_intervention(params, dictionary_multipliers)
+            dictionary_multipliers = {
+                k: strength * v for k, v in top_dimensions[style].items()
+            }
+            result = diffusion.generate_with_intervention(
+                params, dictionary_multipliers
+            )
             results.append(result[0].image)
 
         return results
 
-    def make_sample_images(self, diffusion: WrappedDiffusion, styles: list[str],
-                           top_dimensions: dict[str, dict[int, float]]):
+    def make_sample_images(
+        self,
+        diffusion: WrappedDiffusion,
+        styles: list[str],
+        top_dimensions: dict[str, dict[int, float]],
+    ):
         no_intervention_row = self._make_image_row_no_intervention(diffusion, styles)
         intervention_rows = [
-            self._make_image_row_with_intervention(diffusion, styles, strength, top_dimensions)
+            self._make_image_row_with_intervention(
+                diffusion, styles, strength, top_dimensions
+            )
             for strength in self.cfg.intervention_strengths
         ]
 
@@ -214,8 +239,8 @@ class AnalysisRunner:
 
         for i, image in enumerate(no_intervention_row):
             axes[0, i].imshow(image)
-            axes[0, i].set_title(f'{styles[i]}')
-            axes[0, i].axis('off')
+            axes[0, i].set_title(f"{styles[i]}")
+            axes[0, i].axis("off")
 
         for row_idx, img_row in enumerate(intervention_rows, start=1):
             for img_idx, img in enumerate(img_row):
@@ -225,13 +250,17 @@ class AnalysisRunner:
         row_labels = ["-"] + [str(s) for s in self.cfg.intervention_strengths]
         for r, label in enumerate(row_labels):
             ax = axes[r, 0]
-            ax.set_ylabel(label, rotation=0, fontsize=12, va='center', ha='right', labelpad=12)
+            ax.set_ylabel(
+                label, rotation=0, fontsize=12, va="center", ha="right", labelpad=12
+            )
 
         fig.subplots_adjust(left=0.12, top=0.95, bottom=0.05)
         plt.tight_layout()
         return fig
 
-    def process_and_save_results(self, wb_run, per_style_analysis_results, sample_images_fig):
+    def process_and_save_results(
+        self, wb_run, per_style_analysis_results, sample_images_fig
+    ):
         out_dir = self.cfg.out_dir / wb_run.id
         out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -260,8 +289,11 @@ class AnalysisRunner:
         sample_images_fig.savefig(sample_path, bbox_inches="tight")
         plt.close(sample_images_fig)
 
-        art = wandb.Artifact(name=f"analysis-{wb_run.id}", type="analysis",
-                             metadata={"model_artifact": self.cfg.schmidhuber_artifact_id})
+        art = wandb.Artifact(
+            name=f"analysis-{wb_run.id}",
+            type="analysis",
+            metadata={"model_artifact": self.cfg.schmidhuber_artifact_id},
+        )
         art.add_dir(str(out_dir))
 
         wb_run.log_artifact(art)
@@ -282,12 +314,18 @@ class AnalysisRunner:
             prompt_ds = self._load_prompts_dataset()
 
             generation_params = self._make_generation_params(prompt_ds)
-            generation_results = diffusion.generate_and_collect_dictionary(generation_params, self.cfg.batch_size)
-            dictionary_ds = self._make_dictionary_representations_dataset(generation_results, prompt_ds)
+            generation_results = diffusion.generate_and_collect_dictionary(
+                generation_params, self.cfg.batch_size
+            )
+            dictionary_ds = self._make_dictionary_representations_dataset(
+                generation_results, prompt_ds
+            )
 
             styles = sorted(set(prompt_ds["style"]))
             per_style_analysis_results = {
-                style: self.analyze_style(style, dictionary_ds, self.cfg.top_k_dimensions)
+                style: self.analyze_style(
+                    style, dictionary_ds, self.cfg.top_k_dimensions
+                )
                 for style in styles
             }
 
@@ -295,8 +333,12 @@ class AnalysisRunner:
                 style: per_style_analysis_results[style]["top_features"]
                 for style in styles
             }
-            sample_images_fig = self.make_sample_images(diffusion, styles, top_dimensions)
-            self.process_and_save_results(wb_run, per_style_analysis_results, sample_images_fig)
+            sample_images_fig = self.make_sample_images(
+                diffusion, styles, top_dimensions
+            )
+            self.process_and_save_results(
+                wb_run, per_style_analysis_results, sample_images_fig
+            )
 
         finally:
             wb_run.finish()
