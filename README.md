@@ -5,13 +5,23 @@
 
 
 ## TODO
-* Identyfikacja interesujących wymiarów słownika
-  * score oceniający jak ciekawy jest feature w papierze sauron
-  * coś jak tf-idf
-* Tuning hiperparametrów
-  * możemy np. wziąć samą stratę rekonstrukcji
-  * może mierzyć sparsity na zbiorze walidacyjnym
-  * spróbować expansion factor 16 jak w SAeUron
+* Opracowanie wyników ewaluacji wytrenowanych modeli
+
+## Zrealizowane
+* Zbieranie aktywacji z warstw modelu StableDiffusion 1.4 dla promptów ze zbioru danych COCO.
+  * Zapisane w zbiorze danych dostępnym na [HuggingFace](https://huggingface.co/datasets/mgarbowski/zzsn-activations-2_unet.up_blocks.1.attentions.2)
+* Implementacja i trening modelu minimalizowania przewidywalności.
+  * Wagi wytrenowanych modeli zapisane na platformie [Weights and Biases](https://wandb.ai/mikolaj-garbowski-warsaw-university-of-technology/zzsn-projekt?nw=nwusermikolajgarbowski)
+* Implementacja metody interwencji w generację obrazka
+  * klasa `WrappedDiffusion`
+  * demonstracja API w [notatniku](./notebooks/04-intervention-demo.ipynb)
+* Wizualizacja aktywacji poszczególnych wymiarów słownika w postaci heatmap
+  * demonstracja API w [notatniku](./notebooks/05-saliency.ipynb)
+* Analiza przestrzeni słownika pod kątem istotności wymiarów reprezentacji dla danych konceptów
+  * skrypt `analyze_autoencoder`
+  * przykładowy [job](https://wandb.ai/mikolaj-garbowski-warsaw-university-of-technology/zzsn-projekt/runs/t1n57bkx?nw=nwusermikolajgarbowski) z wynikami analizy
+  * ocena wymiarów miarą opisaną w paperze SAeUron (koncepcyjnie podobna do TF-IDF)
+
 
 ## Pomysły na dalsze eksperymenty
 
