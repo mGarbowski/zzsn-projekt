@@ -266,10 +266,11 @@ class Trainer:
             if self.wrapped_diffusion is not None:
                 self.generate_preview_images(artifact, checkpoint_dir, step_idx)
 
-
             wandb.log_artifact(artifact)
 
-    def generate_preview_images(self, artifact: Artifact, checkpoint_dir: Path, step_idx: int) -> None:
+    def generate_preview_images(
+        self, artifact: Artifact, checkpoint_dir: Path, step_idx: int
+    ) -> None:
         """Generate a sample image with and without intervention and add to the artifact"""
         assert self.wrapped_diffusion is not None
 
@@ -286,9 +287,7 @@ class Trainer:
         )[0].image
 
         normal_path = checkpoint_dir / f"preview_normal_step_{step_idx}.png"
-        intervened_path = (
-                checkpoint_dir / f"preview_intervention_step_{step_idx}.png"
-        )
+        intervened_path = checkpoint_dir / f"preview_intervention_step_{step_idx}.png"
         normal_img.save(str(normal_path))
         intervened_img.save(str(intervened_path))
 
