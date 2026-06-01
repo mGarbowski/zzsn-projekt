@@ -12,21 +12,23 @@ from conf.paths import SCRATCH_ROOT
 class TrainScriptConfig:
     # model config
     input_dim: int = 1280
-    expansion_factor: int = 2
+    expansion_factor: int = 8
     predictor_hidden_dims: list[int] = field(default_factory=lambda: [256])
     predictor_dropout: float = 0.3
     predictor_embedding_dim: int = 128
 
     # trainer config
-    batch_size: int = 32
+    batch_size: int = 16
     batches_per_phase: int = 16
-    num_epochs: int = 3
+    num_epochs: int = 2
+    num_steps_per_checkpoint: int = 20_000
+    num_validation_batches_per_checkpoint: int = 128
     learning_rate_predictors: float = 4e-4
     learning_rate_autoencoder: float = 1e-4
     reconstruction_loss_weight: float = 1.0
 
     # data config
-    dataset_repo_id: str = "mgarbowski/zzsn-activations-1_unet.up_blocks.1.attentions.2"
+    dataset_repo_id: str = "mgarbowski/zzsn-activations-2_unet.up_blocks.1.attentions.2"
     dataset_split: str = "train"
     num_workers: int = 0
     shuffle: bool = True
@@ -51,6 +53,10 @@ class TrainScriptConfig:
             raise ValueError("batches_per_phase must be > 0")
         if self.num_epochs <= 0:
             raise ValueError("num_epochs must be > 0")
+        if self.num_steps_per_checkpoint <= 0:
+            raise ValueError("num_steps_per_checkpoint must be > 0")
+        if self.num_validation_batches_per_checkpoint <= 0:
+            raise ValueError("num_validation_batches_per_checkpoint must be > 0")
         if self.learning_rate_predictors <= 0:
             raise ValueError("learning_rate_predictors must be > 0")
         if self.learning_rate_autoencoder <= 0:

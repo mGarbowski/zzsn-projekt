@@ -1,4 +1,3 @@
-# scripts/train.py
 import sys
 import traceback
 from pathlib import Path
@@ -9,7 +8,7 @@ import torch
 from omegaconf import OmegaConf, SCMode
 
 from conf.paths import HYDRA_CONFIG_ROOT_STR
-from models.dataset import DataSourceConfig, get_data_loader
+from models.dataset import DataSourceConfig, get_data_loaders
 from models.linear import SchmidhuberLinear, SchmidhuberLinearConfig
 from models.train_config import TrainScriptConfig, register_configs
 from models.training import Trainer, TrainerConfig
@@ -49,6 +48,8 @@ def main(cfg: TrainScriptConfig) -> None:
             model_config=model_cfg,
             batches_per_phase=run_cfg.batches_per_phase,
             num_epochs=run_cfg.num_epochs,
+            num_steps_per_checkpoint=run_cfg.num_steps_per_checkpoint,
+            num_validation_batches_per_checkpoint=run_cfg.num_validation_batches_per_checkpoint,
             learning_rate_predictors=run_cfg.learning_rate_predictors,
             learning_rate_autoencoder=run_cfg.learning_rate_autoencoder,
             reconstruction_loss_weight=run_cfg.reconstruction_loss_weight,
@@ -64,10 +65,10 @@ def main(cfg: TrainScriptConfig) -> None:
         print(f"Created model with {model.num_parameters()} parameters")
 
         print("Loading data...")
-        loader = get_data_loader(data_source_cfg)
+        loaders = get_data_loaders(data_source_cfg)
 
         print("Starting training...")
-        Trainer(trainer_cfg, model).train(loader)
+        Trainer(trainer_cfg, model).train(loaders["train"], loaders["val"])
 
     except Exception:
         traceback.print_exc(file=sys.stderr)
