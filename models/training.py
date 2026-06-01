@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from diffusers import StableDiffusionPipeline
 from loguru import logger
+from wandb import Artifact
 
 from models.diffusion import GenerationParams, WrappedDiffusion
 from models.linear import SchmidhuberLinear, SchmidhuberLinearConfig
@@ -262,31 +263,34 @@ class Trainer:
             )
             artifact.add_file(str(checkpoint_path))
 
-            if self.wrapped_diffusion is None:
-                logger.warning(
-                    "No diffusion model loaded — skipping preview image generation. "
-                    "Call load_diffusion_model() before training to enable this."
-                )
-            else:
-                preview_params = GenerationParams(
-                    prompts=[_PREVIEW_PROMPT],
-                    num_seeds=1,
-                    num_inference_steps=_PREVIEW_STEPS,
-                    guidance_scale=_PREVIEW_GUIDANCE,
-                )
-                normal_img = self.wrapped_diffusion.generate(preview_params)[0].image
-                intervened_img = self.wrapped_diffusion.generate_with_intervention(
-                    preview_params, {}
-                )[0].image
+            if self.wrapped_diffusion is not None:
+                self.generate_preview_images(artifact, checkpoint_dir, step_idx)
 
-                normal_path = checkpoint_dir / f"preview_normal_epoch_{epoch_idx}.png"
-                intervened_path = (
-                    checkpoint_dir / f"preview_intervention_epoch_{epoch_idx}.png"
-                )
-                normal_img.save(str(normal_path))
-                intervened_img.save(str(intervened_path))
-
-                artifact.add_file(str(normal_path))
-                artifact.add_file(str(intervened_path))
 
             wandb.log_artifact(artifact)
+
+    def generate_preview_images(self, artifact: Artifact, checkpoint_dir: Path, step_idx: int) -> None:
+        """Generate a sample image with and without intervention and add to the artifact"""
+        assert self.wrapped_diffusion is not None
+
+        preview_params = GenerationParams(
+            prompts=[_PREVIEW_PROMPT],
+            num_seeds=1,
+            num_inference_steps=_PREVIEW_STEPS,
+            guidance_scale=_PREVIEW_GUIDANCE,
+        )
+
+        normal_img = self.wrapped_diffusion.generate(preview_params)[0].image
+        intervened_img = self.wrapped_diffusion.generate_with_intervention(
+            preview_params, {}
+        )[0].image
+
+        normal_path = checkpoint_dir / f"preview_normal_step_{step_idx}.png"
+        intervened_path = (
+                checkpoint_dir / f"preview_intervention_step_{step_idx}.png"
+        )
+        normal_img.save(str(normal_path))
+        intervened_img.save(str(intervened_path))
+
+        artifact.add_file(str(normal_path))
+        artifact.add_file(str(intervened_path))
