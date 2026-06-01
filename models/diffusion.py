@@ -178,6 +178,100 @@ class WrappedDiffusion:
 
         return results
 
+    def generate_and_collect_heatmaps(
+        self,
+        params: GenerationParams,
+        features_to_collect: list[int],
+        batch_size: int = 1,
+    ) -> list[tuple[GenerationResult, torch.Tensor]]:
+        """Run generation for all (prompt, seed) pairs and collect activation heatmaps.
+
+        Iterates the Cartesian product of params.prompts x range(params.num_seeds)
+        in batches of batch_size.
+
+        Returns one (GenerationResult, heatmap tensor) pair per (prompt, seed) pair.
+        Heatmap is a tensor of shape (n_features, n_timesteps, H, W)
+        containing the per spatial patch activations of the specified features across the generation trajectory.
+        """
+        if not features_to_collect:
+            raise ValueError("features_to_collect must not be empty")
+
+        pairs = [
+            (prompt, seed)
+            for prompt in params.prompts
+            for seed in range(params.num_seeds)
+        ]
+
+        results: list[tuple[GenerationResult, torch.Tensor]] = []
+
+        layer = self._locate_layer(self.layer_name)
+
+        for batch in _chunked(pairs, batch_size):
+            batch_prompts = [p for p, _ in batch]
+            batch_seeds = [s for _, s in batch]
+            generators = [
+                torch.Generator(device="cpu").manual_seed(s) for s in batch_seeds
+            ]
+
+            per_timestep: list[torch.Tensor] = []
+
+            def hook(_module, _inputs, output, _buf=per_timestep):
+                act = output[0] if isinstance(output, tuple) else output
+
+                assert act.ndim == 4
+                B, C, H, W = act.shape
+                patches = act.view(B, C, H * W).permute(0, 2, 1)  # (B, N, C)
+
+                # With CFG the UNet doubles the batch (uncond + cond); keep cond half.
+                if patches.shape[0] % 2 == 0 and params.guidance_scale > 1.0:
+                    _, patches = patches.chunk(2, dim=0)
+
+                B2, N, C2 = patches.shape
+                encoder = self.schmidhuber.encoder
+                param = next(encoder.parameters())
+
+                patches_flat = patches.reshape(B2 * N, C2).to(
+                    device=param.device, dtype=param.dtype
+                )
+                with torch.no_grad():
+                    encoded_flat = encoder(patches_flat)  # (B2*N, dict_dim)
+
+                encoded = encoded_flat.view(B2, N, -1)  # (B2, N, dict_dim)
+                encoded = encoded[
+                    :, :, features_to_collect
+                ]  # only the selected dimensions from dict_dim
+                encoded = encoded.permute(0, 2, 1).reshape(
+                    B2, len(features_to_collect), H, W
+                )
+                _buf.append(encoded.detach().cpu())
+
+            handle = layer.register_forward_hook(hook)
+            try:
+                with torch.no_grad():
+                    output = self.diffusion(
+                        batch_prompts,
+                        num_inference_steps=params.num_inference_steps,
+                        guidance_scale=params.guidance_scale,
+                        generator=generators,
+                    )
+            finally:
+                handle.remove()
+
+            stacked = torch.stack(per_timestep, dim=0)  # (T, B, F, H, W)
+            for i, (prompt, seed) in enumerate(batch):
+                results.append(
+                    (
+                        GenerationResult(
+                            prompt=prompt,
+                            seed=seed,
+                            image=output.images[i],
+                        ),
+                        stacked[:, i, :, :, :].permute(1, 0, 2, 3).contiguous(),
+                    )
+                )
+
+        return results
+
     def generate(
         self,
         params: GenerationParams,
