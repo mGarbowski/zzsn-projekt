@@ -22,6 +22,18 @@
   * przykładowy [job](https://wandb.ai/mikolaj-garbowski-warsaw-university-of-technology/zzsn-projekt/runs/t1n57bkx?nw=nwusermikolajgarbowski) z wynikami analizy
   * ocena wymiarów miarą opisaną w paperze SAeUron (koncepcyjnie podobna do TF-IDF)
 
+## Przykładowe działanie interwencji
+
+Obrazki otrzymane w wyniki przeskalowania najistotniejszych wymiarów słownika dla danego stylu z siłą odpowiednio w
+kolejnych wierszach:
+
+* oryginalny obrazek (bez użycia autokodera)
+* 1
+* 0
+* -1
+* -10
+
+![Demonstracja obrazków otrzymanych w wyniku interwencji](./docs/img/example.png)
 
 ## Pomysły na dalsze eksperymenty
 
