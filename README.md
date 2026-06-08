@@ -4,9 +4,6 @@
 * Maksym Bieńkowski
 
 
-## TODO
-* Opracowanie wyników ewaluacji wytrenowanych modeli
-
 ## Zrealizowane
 * Zbieranie aktywacji z warstw modelu StableDiffusion 1.4 dla promptów ze zbioru danych COCO.
   * Zapisane w zbiorze danych dostępnym na [HuggingFace](https://huggingface.co/datasets/mgarbowski/zzsn-activations-2_unet.up_blocks.1.attentions.2)
