@@ -309,51 +309,7 @@ class WrappedDiffusion:
 
         return results
 
-    # TODO remove this
     def generate_with_intervention(
-        self,
-        params: GenerationParams,
-        dictionary_multipliers: dict[int, float],
-        batch_size: int = 1,
-    ) -> list[GenerationResult]:
-        """Run generation with dictionary-space intervention for all (prompt, seed) pairs.
-
-        Returns one GenerationResult per (prompt, seed) pair. trajectory is None
-        since activations are not collected during intervention.
-        """
-        multipliers = self._multipliers_dict_to_tensor(dictionary_multipliers)
-
-        layer = self._locate_layer(self.layer_name)
-
-        def hook(_module, _inputs, output):
-            is_tuple = isinstance(output, tuple)
-            act = output[0] if is_tuple else output
-
-            B, C, H, W = act.shape
-            with torch.no_grad():
-                param = next(self.schmidhuber.parameters())
-                act_flat = act.permute(0, 2, 3, 1).reshape(B * H * W, C)
-                act_flat = act_flat.to(device=param.device, dtype=param.dtype)
-
-                encoded = self.schmidhuber.encoder(act_flat)
-                encoded = encoded * multipliers.to(
-                    device=encoded.device, dtype=encoded.dtype
-                )
-                decoded = self.schmidhuber.decoder(encoded)
-                modified = decoded.reshape(B, H, W, C).permute(0, 3, 1, 2)
-                modified = modified.to(device=act.device, dtype=act.dtype)
-
-            return (modified,) + output[1:] if is_tuple else modified
-
-        handle = layer.register_forward_hook(hook)
-        try:
-            results = self.generate(params, batch_size)
-        finally:
-            handle.remove()
-
-        return results
-
-    def generate_with_intervention_2(
         self,
         params: GenerationParams,
         dictionary_multipliers: dict[int, float],
@@ -382,18 +338,20 @@ class WrappedDiffusion:
                 act_flat = act.permute(0, 2, 3, 1).reshape(B * H * W, C)
                 act_flat = act_flat.to(device=param.device, dtype=param.dtype)
 
+                encoded = self.schmidhuber.encoder(act_flat)
+
                 # Pass without intervention to calculate the reconstruction diff
-                encoded_no_intervention = self.schmidhuber.encoder(act_flat)
-                decoded_no_intervention = self.schmidhuber.decoder(encoded_no_intervention)
+                decoded_no_intervention = self.schmidhuber.decoder(encoded)
                 reconstruction_diff = act_flat - decoded_no_intervention
 
                 # Pass with intervention
-                encoded = self.schmidhuber.encoder(act_flat)
-                encoded = encoded * multipliers.to(
+                latent_with_intervention = encoded * multipliers.to(
                     device=encoded.device, dtype=encoded.dtype
                 )
-                decoded = self.schmidhuber.decoder(encoded)
-                decoded = decoded + reconstruction_diff  # compensate for the reconstruction errors
+                decoded = self.schmidhuber.decoder(latent_with_intervention)
+                decoded = (
+                    decoded + reconstruction_diff
+                )  # compensate for the reconstruction errors
                 modified = decoded.reshape(B, H, W, C).permute(0, 3, 1, 2)
                 modified = modified.to(device=act.device, dtype=act.dtype)
 
