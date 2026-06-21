@@ -47,6 +47,7 @@ class AnalysisRunner:
             schmidhuber_artifact_id=self.cfg.schmidhuber_artifact_id,
             diffusion_model_id=self.cfg.diffusion_model_id,
             device=self.cfg.device,
+            safety_checker=None
         )
 
     def _load_prompts_dataset(self):
