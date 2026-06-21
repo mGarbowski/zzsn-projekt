@@ -317,6 +317,10 @@ class WrappedDiffusion:
     ) -> list[GenerationResult]:
         """Run generation with dictionary-space intervention for all (prompt, seed) pairs.
 
+        Compensate the reconstruction errors by first running the activations through th Schmidhuber model
+        without intervention, calculating the difference original-reconstruction.
+        Then adding this difference to the reconstructed activations after intervention.
+
         Returns one GenerationResult per (prompt, seed) pair. trajectory is None
         since activations are not collected during intervention.
         """
@@ -335,10 +339,19 @@ class WrappedDiffusion:
                 act_flat = act_flat.to(device=param.device, dtype=param.dtype)
 
                 encoded = self.schmidhuber.encoder(act_flat)
-                encoded = encoded * multipliers.to(
+
+                # Pass without intervention to calculate the reconstruction diff
+                decoded_no_intervention = self.schmidhuber.decoder(encoded)
+                reconstruction_diff = act_flat - decoded_no_intervention
+
+                # Pass with intervention
+                latent_with_intervention = encoded * multipliers.to(
                     device=encoded.device, dtype=encoded.dtype
                 )
-                decoded = self.schmidhuber.decoder(encoded)
+                decoded = self.schmidhuber.decoder(latent_with_intervention)
+                decoded = (
+                    decoded + reconstruction_diff
+                )  # compensate for the reconstruction errors
                 modified = decoded.reshape(B, H, W, C).permute(0, 3, 1, 2)
                 modified = modified.to(device=act.device, dtype=act.dtype)
 
